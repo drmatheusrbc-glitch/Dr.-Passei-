@@ -1,4 +1,4 @@
-// This file is deprecated.
-// The project has been migrated to Supabase.
-// Please check supabaseClient.ts for configuration.
+// ARQUIVO OBSOLETO
+// Pode ser excluído do repositório com segurança.
+// A configuração do banco de dados foi migrada para o Supabase (ver supabaseClient.ts).
 export {};
