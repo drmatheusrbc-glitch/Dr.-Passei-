@@ -5,7 +5,8 @@ import { PlanDashboard } from './components/PlanDashboard';
 import { SubjectsManager } from './components/SubjectsManager';
 import { QuestionsManager } from './components/QuestionsManager';
 import { StatisticsDashboard } from './components/StatisticsDashboard';
-import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud } from 'lucide-react';
+import { CalendarView } from './components/CalendarView';
+import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, Calendar as CalendarIcon } from 'lucide-react';
 import { storageService } from './services/storage';
 
 export default function App() {
@@ -412,6 +413,18 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setCurrentView('calendar')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              currentView === 'calendar' 
+                ? 'bg-medical-50 text-medical-700' 
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <CalendarIcon className="w-5 h-5" />
+            Calendário
+          </button>
+
+          <button
             onClick={() => setCurrentView('statistics')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               currentView === 'statistics' 
@@ -494,6 +507,9 @@ export default function App() {
               onCompleteRevision={handleCompleteRevision}
               onDeleteRevision={handleDeleteRevision}
             />
+          )}
+          {currentView === 'calendar' && (
+            <CalendarView plan={selectedPlan} />
           )}
           {currentView === 'statistics' && (
             <StatisticsDashboard plan={selectedPlan} />

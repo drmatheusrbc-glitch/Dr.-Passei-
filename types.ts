@@ -38,7 +38,7 @@ export interface Plan {
   studySessions: StudySession[]; // History for charts
 }
 
-export type ViewState = 'dashboard' | 'subjects' | 'questions' | 'schedule' | 'statistics';
+export type ViewState = 'dashboard' | 'subjects' | 'questions' | 'schedule' | 'statistics' | 'calendar';
 
 export interface PlanStats {
   totalSubjects: number;
