@@ -6,7 +6,8 @@ import { SubjectsManager } from './components/SubjectsManager';
 import { QuestionsManager } from './components/QuestionsManager';
 import { StatisticsDashboard } from './components/StatisticsDashboard';
 import { CalendarView } from './components/CalendarView';
-import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, Calendar as CalendarIcon } from 'lucide-react';
+import { SettingsView } from './components/SettingsView'; // Imported new component
+import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, Calendar as CalendarIcon, Settings } from 'lucide-react';
 import { storageService } from './services/storage';
 
 export default function App() {
@@ -475,12 +476,26 @@ export default function App() {
           </button>
         </nav>
         
-        {/* Status Indicator */}
-        <div className="p-4 border-t border-slate-100">
-          <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium px-4 mb-3">
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-slate-100 space-y-1">
+          <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium px-4 mb-2">
              <Cloud className="w-4 h-4" />
              Sincronização Ativa
           </div>
+          
+          {/* Config Button (New) */}
+          <button
+            onClick={() => setCurrentView('settings')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              currentView === 'settings'
+                ? 'bg-medical-50 text-medical-700'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Settings className="w-5 h-5" />
+            Configurações
+          </button>
+
           <button
             onClick={() => setSelectedPlanId(null)}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
@@ -497,10 +512,10 @@ export default function App() {
         <header className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">
-              {selectedPlan.name}
+              {currentView === 'settings' ? 'Configurações' : selectedPlan.name}
             </h1>
             <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
-              {planStats && (
+              {planStats && currentView !== 'settings' && (
                 <>
                   <span className="flex items-center gap-1">
                     <span className="font-semibold text-slate-700">{planStats.totalSubjects}</span> Disciplinas
@@ -552,6 +567,9 @@ export default function App() {
           )}
           {currentView === 'statistics' && (
             <StatisticsDashboard plan={selectedPlan} />
+          )}
+          {currentView === 'settings' && (
+            <SettingsView plan={selectedPlan} onResetProgress={handleResetProgress} />
           )}
         </div>
       </main>
