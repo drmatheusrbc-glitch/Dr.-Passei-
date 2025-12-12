@@ -104,6 +104,19 @@ export default function App() {
     updateSinglePlan(updatedPlan);
   };
 
+  const handleEditSubject = (subjectId: string, newName: string) => {
+    if (!selectedPlan) return;
+
+    const updatedPlan = {
+      ...selectedPlan,
+      subjects: selectedPlan.subjects.map(s => 
+        s.id === subjectId ? { ...s, name: newName } : s
+      )
+    };
+
+    updateSinglePlan(updatedPlan);
+  };
+
   const handleDeleteSubject = (subjectId: string) => {
     if (!selectedPlan) return;
     if (!window.confirm("Tem certeza? Todos os tópicos desta disciplina serão perdidos.")) return;
@@ -132,6 +145,27 @@ export default function App() {
               questionsCorrect: 0,
               revisions: []
             }]
+          };
+        }
+        return subject;
+      })
+    };
+
+    updateSinglePlan(updatedPlan);
+  };
+
+  const handleEditTopic = (subjectId: string, topicId: string, newName: string) => {
+    if (!selectedPlan) return;
+
+    const updatedPlan = {
+      ...selectedPlan,
+      subjects: selectedPlan.subjects.map(subject => {
+        if (subject.id === subjectId) {
+          return {
+            ...subject,
+            topics: subject.topics.map(t => 
+              t.id === topicId ? { ...t, name: newName } : t
+            )
           };
         }
         return subject;
@@ -446,8 +480,10 @@ export default function App() {
             <SubjectsManager 
               plan={selectedPlan}
               onAddSubject={handleAddSubject}
-              onAddTopic={handleAddTopic}
+              onEditSubject={handleEditSubject}
               onDeleteSubject={handleDeleteSubject}
+              onAddTopic={handleAddTopic}
+              onEditTopic={handleEditTopic}
               onDeleteTopic={handleDeleteTopic}
             />
           )}
