@@ -6,8 +6,8 @@ import { SubjectsManager } from './components/SubjectsManager';
 import { QuestionsManager } from './components/QuestionsManager';
 import { StatisticsDashboard } from './components/StatisticsDashboard';
 import { CalendarView } from './components/CalendarView';
-import { SettingsView } from './components/SettingsView'; // Imported new component
-import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, Calendar as CalendarIcon, Settings } from 'lucide-react';
+import { SettingsView } from './components/SettingsView';
+import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, Calendar as CalendarIcon, Settings, Menu, ChevronLeft } from 'lucide-react';
 import { storageService } from './services/storage';
 
 export default function App() {
@@ -16,6 +16,9 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  
+  // UI State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Load from storage on mount
   useEffect(() => {
@@ -358,9 +361,6 @@ export default function App() {
   const handleResetProgress = () => {
     if (!selectedPlan) return;
     
-    // Clear study sessions history (chart data)
-    // Clear completed revisions
-    // Reset topic counters
     const updatedPlan = {
       ...selectedPlan,
       studySessions: [],
@@ -370,8 +370,6 @@ export default function App() {
           ...topic,
           questionsTotal: 0,
           questionsCorrect: 0,
-          // Keep only pending revisions (not completed)
-          // If you want to delete ALL revisions including scheduled ones, remove the filter and return []
           revisions: topic.revisions.filter(r => !r.isCompleted) 
         }))
       }))
@@ -404,17 +402,27 @@ export default function App() {
 
   // Render Main App Layout
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col fixed inset-y-0 z-20">
-        <div className="p-6 border-b border-slate-100">
+      <aside 
+        className={`fixed inset-y-0 left-0 z-20 w-64 bg-white border-r border-slate-200 flex flex-col transition-transform duration-300 ease-in-out ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2 text-medical-600 font-bold text-xl">
              <div className="w-8 h-8 bg-medical-600 text-white rounded-lg flex items-center justify-center">D</div>
              Dr. Passei
           </div>
+          <button 
+            onClick={() => setIsSidebarOpen(false)}
+            className="lg:hidden text-slate-400 hover:text-slate-600"
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </button>
         </div>
         
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <button
             onClick={() => setCurrentView('dashboard')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
@@ -483,7 +491,6 @@ export default function App() {
              Sincronização Ativa
           </div>
           
-          {/* Config Button (New) */}
           <button
             onClick={() => setCurrentView('settings')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
@@ -507,32 +514,46 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 flex flex-col min-h-screen">
+      <main 
+        className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ease-in-out ${
+          isSidebarOpen ? 'ml-64' : 'ml-0'
+        }`}
+      >
         {/* Header */}
         <header className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">
-              {currentView === 'settings' ? 'Configurações' : selectedPlan.name}
-            </h1>
-            <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
-              {planStats && currentView !== 'settings' && (
-                <>
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">{planStats.totalSubjects}</span> Disciplinas
-                  </span>
-                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">{planStats.totalTopics}</span> Tópicos
-                  </span>
-                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">{planStats.totalQuestions}</span> Questões
-                  </span>
-                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
-                    {planStats.accuracy.toFixed(1)}% Acerto
-                  </span>
-                </>
-              )}
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors focus:outline-none"
+              title={isSidebarOpen ? "Recolher Menu" : "Expandir Menu"}
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            
+            <div>
+              <h1 className="text-2xl font-bold text-slate-800">
+                {currentView === 'settings' ? 'Configurações' : selectedPlan.name}
+              </h1>
+              <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
+                {planStats && currentView !== 'settings' && (
+                  <>
+                    <span className="flex items-center gap-1 hidden sm:flex">
+                      <span className="font-semibold text-slate-700">{planStats.totalSubjects}</span> Disciplinas
+                    </span>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full hidden sm:block"></span>
+                    <span className="flex items-center gap-1 hidden sm:flex">
+                      <span className="font-semibold text-slate-700">{planStats.totalTopics}</span> Tópicos
+                    </span>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full hidden sm:block"></span>
+                    <span className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-700">{planStats.totalQuestions}</span> Questões
+                    </span>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold ml-2">
+                      {planStats.accuracy.toFixed(1)}% Acerto
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </header>
