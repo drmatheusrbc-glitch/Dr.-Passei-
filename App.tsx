@@ -5,7 +5,8 @@ import { PlanDashboard } from './components/PlanDashboard';
 import { SubjectsManager } from './components/SubjectsManager';
 import { QuestionsManager } from './components/QuestionsManager';
 import { StatisticsDashboard } from './components/StatisticsDashboard';
-import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2 } from 'lucide-react';
+import { SettingsManager } from './components/SettingsManager';
+import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, Wifi, Settings } from 'lucide-react';
 import { storageService } from './services/storage';
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  const [isCloudReady, setIsCloudReady] = useState(false);
 
   // Load from storage on mount
   useEffect(() => {
@@ -22,6 +24,7 @@ export default function App() {
       try {
         const loadedPlans = await storageService.getPlans();
         setPlans(loadedPlans);
+        setIsCloudReady(true);
       } catch (error) {
         console.error("Failed to load plans", error);
       } finally {
@@ -319,7 +322,7 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4 text-medical-600">
           <Loader2 className="w-12 h-12 animate-spin" />
-          <p className="font-medium text-lg">Carregando Dr. Passei...</p>
+          <p className="font-medium text-lg">Conectando ao Dr. Passei...</p>
         </div>
       </div>
     );
@@ -328,11 +331,18 @@ export default function App() {
   // Render Plan Selection
   if (!selectedPlan) {
     return (
-      <PlanSelection 
-        plans={plans} 
-        onCreatePlan={handleCreatePlan} 
-        onSelectPlan={handleSelectPlan} 
-      />
+      <div className="relative">
+        <PlanSelection 
+          plans={plans} 
+          onCreatePlan={handleCreatePlan} 
+          onSelectPlan={handleSelectPlan} 
+        />
+        {/* Connection Status Badge on Selection Screen */}
+        <div className="absolute top-4 right-4 flex items-center gap-2 bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-200">
+          <div className={`w-2 h-2 rounded-full ${isCloudReady ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+          <span className="text-xs font-medium text-slate-600">{isCloudReady ? 'Nuvem Conectada' : 'Modo Local'}</span>
+        </div>
+      </div>
     );
   }
 
@@ -396,7 +406,34 @@ export default function App() {
             <PieChart className="w-5 h-5" />
             Estatísticas
           </button>
+
+          <div className="pt-4 mt-4 border-t border-slate-100">
+            <button
+              onClick={() => setCurrentView('settings')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                currentView === 'settings' 
+                  ? 'bg-medical-50 text-medical-700' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Settings className="w-5 h-5" />
+              Configurações
+            </button>
+          </div>
         </nav>
+
+        {/* Cloud Status Footer */}
+        <div className="px-4 pb-4">
+          <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 flex items-center gap-3">
+             <div className={`p-2 rounded-full ${isCloudReady ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}`}>
+                {isCloudReady ? <Cloud className="w-4 h-4" /> : <Wifi className="w-4 h-4" />}
+             </div>
+             <div className="flex-1">
+                <p className="text-xs font-bold text-slate-700">{isCloudReady ? 'Sincronizado' : 'Offline'}</p>
+                <p className="text-[10px] text-slate-500">{isCloudReady ? 'Dados na nuvem' : 'Aguardando conexão'}</p>
+             </div>
+          </div>
+        </div>
 
         <div className="p-4 border-t border-slate-100">
           <button
@@ -415,28 +452,30 @@ export default function App() {
         <header className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">
-              {selectedPlan.name}
+              {currentView === 'settings' ? 'Configurações' : selectedPlan.name}
             </h1>
-            <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
-              {planStats && (
-                <>
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">{planStats.totalSubjects}</span> Disciplinas
-                  </span>
-                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">{planStats.totalTopics}</span> Tópicos
-                  </span>
-                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">{planStats.totalQuestions}</span> Questões
-                  </span>
-                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
-                    {planStats.accuracy.toFixed(1)}% Acerto
-                  </span>
-                </>
-              )}
-            </div>
+            {currentView !== 'settings' && (
+              <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
+                {planStats && (
+                  <>
+                    <span className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-700">{planStats.totalSubjects}</span> Disciplinas
+                    </span>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                    <span className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-700">{planStats.totalTopics}</span> Tópicos
+                    </span>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                    <span className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-700">{planStats.totalQuestions}</span> Questões
+                    </span>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                      {planStats.accuracy.toFixed(1)}% Acerto
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
@@ -464,6 +503,9 @@ export default function App() {
           )}
           {currentView === 'statistics' && (
             <StatisticsDashboard plan={selectedPlan} />
+          )}
+          {currentView === 'settings' && (
+            <SettingsManager />
           )}
         </div>
       </main>
