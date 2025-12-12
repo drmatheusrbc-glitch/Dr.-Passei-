@@ -5,7 +5,8 @@ import { PlanDashboard } from './components/PlanDashboard';
 import { SubjectsManager } from './components/SubjectsManager';
 import { QuestionsManager } from './components/QuestionsManager';
 import { StatisticsDashboard } from './components/StatisticsDashboard';
-import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, CloudOff, Wifi } from 'lucide-react';
+import { SettingsManager } from './components/SettingsManager';
+import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, CloudOff, Wifi, Settings } from 'lucide-react';
 import { storageService } from './services/storage';
 import { supabase } from './supabaseClient';
 
@@ -339,12 +340,33 @@ export default function App() {
 
   // Render Plan Selection if no plan selected
   if (!selectedPlan) {
+    // We allow accessing settings even without a plan selected, strictly speaking, 
+    // but the current UI flow puts PlanSelection first. 
+    // For simplicity, let's keep PlanSelection as the "gate", but add a settings button there if needed?
+    // Actually, user is likely already inside a plan or can just create one locally to get to settings.
     return (
-      <PlanSelection 
-        plans={plans} 
-        onCreatePlan={handleCreatePlan} 
-        onSelectPlan={handleSelectPlan} 
-      />
+      <div className="relative">
+        <PlanSelection 
+          plans={plans} 
+          onCreatePlan={handleCreatePlan} 
+          onSelectPlan={handleSelectPlan} 
+        />
+        {/* Quick Settings Access in Selection Screen */}
+        <div className="absolute top-4 right-4">
+             <button 
+               onClick={() => {
+                 // Create a dummy plan or similar? No, let's just create a temp view state or modify PlanSelection.
+                 // Easiest is to force user to enter a plan to see settings, OR
+                 // Just overlay settings here. Let's keep it simple for now.
+                 alert("Selecione ou crie um plano para acessar as configurações.");
+               }}
+               className="p-2 bg-white rounded-full shadow text-slate-400 hover:text-medical-600"
+               title="Configurações"
+             >
+               <Settings className="w-6 h-6" />
+             </button>
+        </div>
+      </div>
     );
   }
 
@@ -408,6 +430,20 @@ export default function App() {
             <PieChart className="w-5 h-5" />
             Estatísticas
           </button>
+
+          <div className="pt-4 mt-4 border-t border-slate-100">
+            <button
+              onClick={() => setCurrentView('settings')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                currentView === 'settings' 
+                  ? 'bg-medical-50 text-medical-700' 
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Settings className="w-5 h-5" />
+              Configurações
+            </button>
+          </div>
         </nav>
 
         {/* Cloud Status Indicator */}
@@ -437,27 +473,31 @@ export default function App() {
         {/* Header */}
         <header className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">{selectedPlan.name}</h1>
-            <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
-              {planStats && (
-                <>
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">{planStats.totalSubjects}</span> Disciplinas
-                  </span>
-                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">{planStats.totalTopics}</span> Tópicos
-                  </span>
-                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                  <span className="flex items-center gap-1">
-                    <span className="font-semibold text-slate-700">{planStats.totalQuestions}</span> Questões
-                  </span>
-                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
-                    {planStats.accuracy.toFixed(1)}% Acerto
-                  </span>
-                </>
-              )}
-            </div>
+            <h1 className="text-2xl font-bold text-slate-800">
+              {currentView === 'settings' ? 'Configurações do Sistema' : selectedPlan.name}
+            </h1>
+            {currentView !== 'settings' && (
+              <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
+                {planStats && (
+                  <>
+                    <span className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-700">{planStats.totalSubjects}</span> Disciplinas
+                    </span>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                    <span className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-700">{planStats.totalTopics}</span> Tópicos
+                    </span>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                    <span className="flex items-center gap-1">
+                      <span className="font-semibold text-slate-700">{planStats.totalQuestions}</span> Questões
+                    </span>
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                      {planStats.accuracy.toFixed(1)}% Acerto
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
@@ -485,6 +525,9 @@ export default function App() {
           )}
           {currentView === 'statistics' && (
             <StatisticsDashboard plan={selectedPlan} />
+          )}
+          {currentView === 'settings' && (
+            <SettingsManager />
           )}
         </div>
       </main>

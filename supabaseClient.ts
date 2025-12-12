@@ -1,18 +1,29 @@
 import { createClient } from '@supabase/supabase-js';
 
 // As chaves agora são carregadas das Variáveis de Ambiente (Vite/Vercel)
-// No Vercel, configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY
+// OU do LocalStorage (Configuração Manual do Usuário)
 
-// Safe access to environment variables to avoid "Cannot read properties of undefined"
 const getEnv = (key: string) => {
+  let value = '';
+  
+  // 1. Tenta pegar do ambiente (Vite)
   try {
-    // Check for Vite injected env
     if (import.meta && import.meta.env) {
-      return import.meta.env[key] || '';
+      value = import.meta.env[key] || '';
     }
   } catch (e) {
     // Ignore error
   }
+
+  // Se encontrou no env, retorna
+  if (value) return value;
+
+  // 2. Tenta pegar do LocalStorage (caso o usuário tenha configurado manualmente)
+  if (typeof window !== 'undefined') {
+    if (key === 'VITE_SUPABASE_URL') return localStorage.getItem('supabase_url') || '';
+    if (key === 'VITE_SUPABASE_ANON_KEY') return localStorage.getItem('supabase_key') || '';
+  }
+
   return '';
 };
 
@@ -28,9 +39,9 @@ const isValidUrl = (url: string) => {
   }
 };
 
-const isConfigured = isValidUrl(supabaseUrl) && supabaseKey.length > 0;
+// Verifica se tem URL válida e uma chave (mesmo que básica)
+const isConfigured = isValidUrl(supabaseUrl) && supabaseKey.length > 20;
 
-// Exporta o cliente se configurado, ou null se estiver faltando chaves
 export const supabase = isConfigured
   ? createClient(supabaseUrl, supabaseKey) 
   : null;
