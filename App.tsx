@@ -5,10 +5,8 @@ import { PlanDashboard } from './components/PlanDashboard';
 import { SubjectsManager } from './components/SubjectsManager';
 import { QuestionsManager } from './components/QuestionsManager';
 import { StatisticsDashboard } from './components/StatisticsDashboard';
-import { SettingsManager } from './components/SettingsManager';
-import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, CloudOff, Wifi, Settings } from 'lucide-react';
+import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2 } from 'lucide-react';
 import { storageService } from './services/storage';
-import { supabase } from './supabaseClient';
 
 export default function App() {
   // State
@@ -16,13 +14,9 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
-  const [isCloudConnected, setIsCloudConnected] = useState(false);
 
-  // Load from storage on mount (Async)
+  // Load from storage on mount
   useEffect(() => {
-    // Check connection type
-    setIsCloudConnected(!!supabase);
-
     const loadData = async () => {
       setIsLoading(true);
       try {
@@ -38,12 +32,8 @@ export default function App() {
   }, []);
 
   // Helper to update local state AND storage persistence
-  // We wrap all state updates in this helper to ensure persistence
   const updatePlans = (newPlans: Plan[]) => {
     setPlans(newPlans);
-    
-    // In a real cloud app, we might want to be more selective (save only the changed plan)
-    // But for this transition, we mimic the previous behavior but routed through the service
     newPlans.forEach(plan => {
       storageService.savePlan(plan);
     });
@@ -98,7 +88,6 @@ export default function App() {
       studySessions: []
     };
     
-    // Optimistic UI update
     setPlans(prev => [...prev, newPlan]);
     await storageService.savePlan(newPlan);
   };
@@ -266,10 +255,8 @@ export default function App() {
               if (topic.id === topicId) {
                 return {
                   ...topic,
-                  // Update aggregate stats
                   questionsTotal: topic.questionsTotal + total,
                   questionsCorrect: topic.questionsCorrect + correct,
-                  // Mark revision as completed
                   revisions: topic.revisions.map(rev => {
                     if (rev.id === revisionId) {
                       return {
@@ -338,35 +325,14 @@ export default function App() {
     );
   }
 
-  // Render Plan Selection if no plan selected
+  // Render Plan Selection
   if (!selectedPlan) {
-    // We allow accessing settings even without a plan selected, strictly speaking, 
-    // but the current UI flow puts PlanSelection first. 
-    // For simplicity, let's keep PlanSelection as the "gate", but add a settings button there if needed?
-    // Actually, user is likely already inside a plan or can just create one locally to get to settings.
     return (
-      <div className="relative">
-        <PlanSelection 
-          plans={plans} 
-          onCreatePlan={handleCreatePlan} 
-          onSelectPlan={handleSelectPlan} 
-        />
-        {/* Quick Settings Access in Selection Screen */}
-        <div className="absolute top-4 right-4">
-             <button 
-               onClick={() => {
-                 // Create a dummy plan or similar? No, let's just create a temp view state or modify PlanSelection.
-                 // Easiest is to force user to enter a plan to see settings, OR
-                 // Just overlay settings here. Let's keep it simple for now.
-                 alert("Selecione ou crie um plano para acessar as configurações.");
-               }}
-               className="p-2 bg-white rounded-full shadow text-slate-400 hover:text-medical-600"
-               title="Configurações"
-             >
-               <Settings className="w-6 h-6" />
-             </button>
-        </div>
-      </div>
+      <PlanSelection 
+        plans={plans} 
+        onCreatePlan={handleCreatePlan} 
+        onSelectPlan={handleSelectPlan} 
+      />
     );
   }
 
@@ -430,32 +396,7 @@ export default function App() {
             <PieChart className="w-5 h-5" />
             Estatísticas
           </button>
-
-          <div className="pt-4 mt-4 border-t border-slate-100">
-            <button
-              onClick={() => setCurrentView('settings')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                currentView === 'settings' 
-                  ? 'bg-medical-50 text-medical-700' 
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <Settings className="w-5 h-5" />
-              Configurações
-            </button>
-          </div>
         </nav>
-
-        {/* Cloud Status Indicator */}
-        <div className="px-4 pb-2">
-          <div className={`rounded-lg p-3 text-xs flex items-center gap-2 border ${isCloudConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-             {isCloudConnected ? <Cloud className="w-4 h-4" /> : <CloudOff className="w-4 h-4" />}
-             <div className="flex flex-col">
-               <span className="font-bold">{isCloudConnected ? 'Sincronizado' : 'Modo Offline'}</span>
-               <span className="text-[10px] opacity-80">{isCloudConnected ? 'Salvo na nuvem' : 'Salvo no navegador'}</span>
-             </div>
-          </div>
-        </div>
 
         <div className="p-4 border-t border-slate-100">
           <button
@@ -474,30 +415,28 @@ export default function App() {
         <header className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between sticky top-0 z-10 shadow-sm">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">
-              {currentView === 'settings' ? 'Configurações do Sistema' : selectedPlan.name}
+              {selectedPlan.name}
             </h1>
-            {currentView !== 'settings' && (
-              <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
-                {planStats && (
-                  <>
-                    <span className="flex items-center gap-1">
-                      <span className="font-semibold text-slate-700">{planStats.totalSubjects}</span> Disciplinas
-                    </span>
-                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                    <span className="flex items-center gap-1">
-                      <span className="font-semibold text-slate-700">{planStats.totalTopics}</span> Tópicos
-                    </span>
-                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                    <span className="flex items-center gap-1">
-                      <span className="font-semibold text-slate-700">{planStats.totalQuestions}</span> Questões
-                    </span>
-                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
-                      {planStats.accuracy.toFixed(1)}% Acerto
-                    </span>
-                  </>
-                )}
-              </div>
-            )}
+            <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
+              {planStats && (
+                <>
+                  <span className="flex items-center gap-1">
+                    <span className="font-semibold text-slate-700">{planStats.totalSubjects}</span> Disciplinas
+                  </span>
+                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                  <span className="flex items-center gap-1">
+                    <span className="font-semibold text-slate-700">{planStats.totalTopics}</span> Tópicos
+                  </span>
+                  <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                  <span className="flex items-center gap-1">
+                    <span className="font-semibold text-slate-700">{planStats.totalQuestions}</span> Questões
+                  </span>
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                    {planStats.accuracy.toFixed(1)}% Acerto
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
@@ -525,9 +464,6 @@ export default function App() {
           )}
           {currentView === 'statistics' && (
             <StatisticsDashboard plan={selectedPlan} />
-          )}
-          {currentView === 'settings' && (
-            <SettingsManager />
           )}
         </div>
       </main>
