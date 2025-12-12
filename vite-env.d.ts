@@ -42,13 +42,5 @@ interface ImportMetaEnv {
 }
 
 interface ImportMeta {
-  readonly url: string;
   readonly env: ImportMetaEnv;
 }
-
-// Support for process.env (often needed for API keys in GenAI SDKs)
-declare var process: {
-  env: {
-    [key: string]: string | undefined;
-  }
-};

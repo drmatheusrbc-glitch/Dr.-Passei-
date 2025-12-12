@@ -1,23 +1,36 @@
 import { createClient } from '@supabase/supabase-js';
 
-// TODO: Substitua pelas chaves do seu projeto Supabase
-// Você encontra em: Settings > API
-const supabaseUrl = 'SUA_SUPABASE_URL_AQUI';
-const supabaseKey = 'SUA_SUPABASE_ANON_KEY_AQUI';
+// As chaves agora são carregadas das Variáveis de Ambiente (Vite/Vercel)
+// No Vercel, configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY
 
-// Validation to prevent "Invalid URL" error during development/template usage
-// This prevents the app from crashing if the user hasn't set up the keys yet
+// Safe access to environment variables to avoid "Cannot read properties of undefined"
+const getEnv = (key: string) => {
+  try {
+    // Check for Vite injected env
+    if (import.meta && import.meta.env) {
+      return import.meta.env[key] || '';
+    }
+  } catch (e) {
+    // Ignore error
+  }
+  return '';
+};
+
+const supabaseUrl = getEnv('VITE_SUPABASE_URL');
+const supabaseKey = getEnv('VITE_SUPABASE_ANON_KEY');
+
+// Validação para garantir que estamos conectados
 const isValidUrl = (url: string) => {
   try {
-    // Check if it's a valid URL structure AND not the placeholder
-    return Boolean(new URL(url)) && !url.includes('SUA_SUPABASE_URL_AQUI');
+    return Boolean(new URL(url));
   } catch (e) {
     return false;
   }
 };
 
-// Create a single supabase client for interacting with your database
-// We export null if configuration is missing so the app defaults to localStorage
-export const supabase = isValidUrl(supabaseUrl) 
+const isConfigured = isValidUrl(supabaseUrl) && supabaseKey.length > 0;
+
+// Exporta o cliente se configurado, ou null se estiver faltando chaves
+export const supabase = isConfigured
   ? createClient(supabaseUrl, supabaseKey) 
   : null;

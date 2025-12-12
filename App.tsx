@@ -5,8 +5,9 @@ import { PlanDashboard } from './components/PlanDashboard';
 import { SubjectsManager } from './components/SubjectsManager';
 import { QuestionsManager } from './components/QuestionsManager';
 import { StatisticsDashboard } from './components/StatisticsDashboard';
-import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, CloudOff, Wifi } from 'lucide-react';
 import { storageService } from './services/storage';
+import { supabase } from './supabaseClient';
 
 export default function App() {
   // State
@@ -14,9 +15,13 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
+  const [isCloudConnected, setIsCloudConnected] = useState(false);
 
   // Load from storage on mount (Async)
   useEffect(() => {
+    // Check connection type
+    setIsCloudConnected(!!supabase);
+
     const loadData = async () => {
       setIsLoading(true);
       try {
@@ -404,6 +409,17 @@ export default function App() {
             Estatísticas
           </button>
         </nav>
+
+        {/* Cloud Status Indicator */}
+        <div className="px-4 pb-2">
+          <div className={`rounded-lg p-3 text-xs flex items-center gap-2 border ${isCloudConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+             {isCloudConnected ? <Cloud className="w-4 h-4" /> : <CloudOff className="w-4 h-4" />}
+             <div className="flex flex-col">
+               <span className="font-bold">{isCloudConnected ? 'Sincronizado' : 'Modo Offline'}</span>
+               <span className="text-[10px] opacity-80">{isCloudConnected ? 'Salvo na nuvem' : 'Salvo no navegador'}</span>
+             </div>
+          </div>
+        </div>
 
         <div className="p-4 border-t border-slate-100">
           <button

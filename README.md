@@ -15,6 +15,7 @@ Plataforma SaaS (Software as a Service) focada na organização, métricas e per
   - Gráficos de evolução de desempenho.
   - KPIs de tópicos estudados vs. total.
   - Análise de precisão por disciplina.
+- **Modo Híbrido**: Funciona Local (Offline) e na Nuvem (Supabase).
 
 ## 🛠 Tecnologias Utilizadas
 
@@ -23,12 +24,13 @@ Plataforma SaaS (Software as a Service) focada na organização, métricas e per
 - **Dados**: Recharts (Visualização de Dados).
 - **Backend/Database**: Supabase (PostgreSQL + Row Level Security).
 
-## ⚙️ Configuração do Supabase
+## ⚙️ Configuração do Supabase (Para Salvar na Nuvem)
 
-Este projeto utiliza o Supabase para persistência de dados. Para rodar o projeto com funcionalidades na nuvem:
+Para que seus dados fiquem salvos online e acessíveis de qualquer dispositivo:
 
-1. Crie uma conta e um projeto em [Supabase.com](https://supabase.com).
-2. Vá até a aba **SQL Editor** no painel do Supabase e execute o seguinte script:
+1. **Crie uma conta:** Acesse [Supabase.com](https://supabase.com).
+2. **Crie um projeto:** Dê um nome (ex: DrPassei).
+3. **Configure o Banco de Dados:** Vá na aba **SQL Editor** e rode este script:
 
 ```sql
 -- Cria a tabela de planos
@@ -41,32 +43,21 @@ create table if not exists plans (
 -- Habilita segurança
 alter table plans enable row level security;
 
--- Cria política de acesso (DEV/MVP)
--- Nota: Em produção, configure autenticação e altere para auth.uid()
+-- Cria política de acesso (Nota: Em produção, adicione Auth do Supabase)
 create policy "Acesso Publico" 
 on plans for all using (true) with check (true);
 ```
 
-3. Nas configurações do projeto (Project Settings > API), copie a **Project URL** e a **anon public key**.
-4. No código do projeto, abra o arquivo `supabaseClient.ts` e atualize as variáveis:
+4. **Pegue as Chaves (API Keys):**
+   - Vá em **Project Settings** > **API**.
+   - Copie a **URL** e a chave **anon public**.
 
-```typescript
-const supabaseUrl = 'SUA_URL_DO_SUPABASE';
-const supabaseKey = 'SUA_CHAVE_ANONIMA';
-```
-
-## 📦 Instalação e Execução
-
-Este projeto foi construído para ser leve e moderno, utilizando *ES Modules* diretamente via browser ou bundlers modernos.
-
-### Opção 1: WebContainer / StackBlitz / Codesandbox
-O projeto roda nativamente nestes ambientes sem configuração extra.
-
-### Opção 2: Localmente (Vite)
-Se desejar rodar em sua máquina:
-1. Clone o repositório.
-2. Instale as dependências (caso migre para npm/vite).
-3. Execute o servidor de desenvolvimento.
+5. **Configure no Vercel (Hospedagem):**
+   - No painel do seu projeto no Vercel, vá em **Settings** > **Environment Variables**.
+   - Adicione as variáveis:
+     - `VITE_SUPABASE_URL`: (Sua URL)
+     - `VITE_SUPABASE_ANON_KEY`: (Sua Chave Anon)
+   - Faça um novo Deploy.
 
 ---
 
