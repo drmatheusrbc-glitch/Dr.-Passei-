@@ -1,4 +1,2 @@
-// ARQUIVO OBSOLETO
-// Pode ser excluído do repositório com segurança.
-// A configuração do banco de dados foi migrada para o Supabase (ver supabaseClient.ts).
-export {};
+// ESTE ARQUIVO DEVE SER EXCLUÍDO
+// A configuração do banco de dados agora utiliza supabaseClient.ts

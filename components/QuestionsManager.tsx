@@ -207,7 +207,7 @@ export const QuestionsManager: React.FC<QuestionsManagerProps> = ({ plan, onRegi
           }`}
         >
           {isFormOpen ? (
-            <>Fehar Cadastro <ChevronUp className="w-4 h-4" /></>
+            <>Fechar Cadastro <ChevronUp className="w-4 h-4" /></>
           ) : (
             <>Cadastrar Questões <Plus className="w-4 h-4" /></>
           )}

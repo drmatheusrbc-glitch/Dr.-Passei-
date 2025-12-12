@@ -8,8 +8,13 @@ Plataforma SaaS (Software as a Service) focada na organização, métricas e per
 ## 🚀 Funcionalidades
 
 - **Gestão de Planos**: Criação de múltiplos cronogramas personalizados (ex: R1 USP, PSU-MG).
-- **Edital Organizado**: Cadastro de Disciplinas e Tópicos.
-- **Registro de Questões**: Lançamento de desempenho (acertos/erros) e controle de teoria.
+- **Edital Organizado**: 
+  - Cadastro de Disciplinas e Tópicos.
+  - **Novo**: Edição e exclusão de conteúdos já cadastrados.
+- **Registro de Questões**: 
+  - Lançamento de desempenho (acertos/erros).
+  - **Automático (D0)**: O estudo do dia é registrado automaticamente como concluído no histórico.
+- **Calendário Interativo**: Visualização mensal de todas as revisões pendentes e concluídas.
 - **Revisão Espaçada**: Agendamento automático de revisões (ex: 7, 14, 30 dias) com base na data de estudo.
 - **Analytics**: 
   - Gráficos de evolução de desempenho.
@@ -37,7 +42,8 @@ Para que seus dados fiquem salvos online e acessíveis de qualquer dispositivo:
 create table if not exists plans (
   id text primary key,
   content jsonb not null,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now())
 );
 
 -- Habilita segurança
