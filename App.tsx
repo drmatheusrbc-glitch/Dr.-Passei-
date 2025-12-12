@@ -221,21 +221,34 @@ export default function App() {
             ...subject,
             topics: subject.topics.map(topic => {
               if (topic.id === topicId) {
-                // Create specific Revision objects
+                // 1. Create Future Revisions (Pending)
                 const newRevisions = revisionDays.map(days => {
                   const date = new Date();
                   date.setDate(date.getDate() + days);
                   return {
                     id: crypto.randomUUID(),
-                    label: `${days} dias`,
+                    label: `D${days}`,
                     scheduledDate: date.toISOString(),
                     isCompleted: false
                   };
                 });
 
+                // 2. Create D0 Revision (Completed Immediately)
+                // This marks the initial study session
+                const d0Revision = {
+                  id: crypto.randomUUID(),
+                  label: 'D0',
+                  scheduledDate: new Date().toISOString(),
+                  isCompleted: true,
+                  completedDate: new Date().toISOString(),
+                  questionsTotal: total,
+                  questionsCorrect: correct
+                };
+
                 // Merge revisions with existing ones
                 const existingRevisions = topic.revisions || [];
-                const allRevisions = [...existingRevisions, ...newRevisions];
+                // Add D0 and Future revisions to the list
+                const allRevisions = [...existingRevisions, d0Revision, ...newRevisions];
 
                 return {
                   ...topic,
