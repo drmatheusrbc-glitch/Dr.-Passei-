@@ -5,7 +5,7 @@ import { PlanDashboard } from './components/PlanDashboard';
 import { SubjectsManager } from './components/SubjectsManager';
 import { QuestionsManager } from './components/QuestionsManager';
 import { StatisticsDashboard } from './components/StatisticsDashboard';
-import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud } from 'lucide-react';
 import { storageService } from './services/storage';
 
 export default function App() {
@@ -389,8 +389,13 @@ export default function App() {
             Estatísticas
           </button>
         </nav>
-
+        
+        {/* Status Indicator */}
         <div className="p-4 border-t border-slate-100">
+          <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium px-4 mb-3">
+             <Cloud className="w-4 h-4" />
+             Sincronização Ativa
+          </div>
           <button
             onClick={() => setSelectedPlanId(null)}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
