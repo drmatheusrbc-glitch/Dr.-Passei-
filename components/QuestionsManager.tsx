@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plan, Revision, Subject, Topic } from '../types';
-import { CheckCircle, Calendar, Save, AlertCircle, Plus, ChevronDown, ChevronUp, Clock, CheckSquare, Flag, X, Trash2, AlertTriangle, Calendar as CalendarIcon } from 'lucide-react';
+import { CheckCircle, Calendar, Save, AlertCircle, Plus, ChevronDown, ChevronUp, Clock, CheckSquare, Flag, X, Trash2, AlertTriangle, Calendar as CalendarIcon, RefreshCcw } from 'lucide-react';
 
 interface QuestionsManagerProps {
   plan: Plan;
@@ -24,11 +24,12 @@ interface QuestionsManagerProps {
     topicId: string,
     revisionId: string
   ) => void;
+  onResetProgress: () => void;
 }
 
 type TabType = 'scheduled' | 'completed' | 'finished';
 
-export const QuestionsManager: React.FC<QuestionsManagerProps> = ({ plan, onRegisterSession, onCompleteRevision, onDeleteRevision }) => {
+export const QuestionsManager: React.FC<QuestionsManagerProps> = ({ plan, onRegisterSession, onCompleteRevision, onDeleteRevision, onResetProgress }) => {
   // UI State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('scheduled');
@@ -128,6 +129,14 @@ export const QuestionsManager: React.FC<QuestionsManagerProps> = ({ plan, onRegi
     setRevCorrect('');
     setSuccessMessage('Revisão concluída!');
     setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  const confirmReset = () => {
+    if (window.confirm("ATENÇÃO: Isso excluirá todo o histórico de revisões realizadas e zerará os contadores de questões de todos os tópicos. As revisões futuras agendadas serão mantidas. Deseja continuar?")) {
+      onResetProgress();
+      setSuccessMessage("Histórico e contadores zerados com sucesso.");
+      setTimeout(() => setSuccessMessage(null), 3000);
+    }
   };
 
   // Helper to flatten data for lists
@@ -435,6 +444,16 @@ export const QuestionsManager: React.FC<QuestionsManagerProps> = ({ plan, onRegi
         {/* COMPLETED TAB */}
         {activeTab === 'completed' && (
           <>
+            <div className="flex justify-end mb-4">
+              <button 
+                onClick={confirmReset}
+                className="flex items-center gap-2 text-sm text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors border border-transparent hover:border-red-100"
+              >
+                <RefreshCcw className="w-4 h-4" />
+                Limpar Histórico e Zerar Contadores
+              </button>
+            </div>
+
             {completed.length === 0 ? (
                <div className="text-center py-12 text-slate-400">
                  <p>Nenhuma revisão realizada ainda.</p>
@@ -443,7 +462,7 @@ export const QuestionsManager: React.FC<QuestionsManagerProps> = ({ plan, onRegi
               completed.map((item, idx) => {
                 const acc = item.revision.questionsTotal > 0 ? (item.revision.questionsCorrect / item.revision.questionsTotal * 100) : 0;
                 return (
-                  <div key={idx} className="bg-slate-50 p-4 rounded-xl border border-slate-200 hover:bg-white hover:shadow-sm transition-all">
+                  <div key={idx} className="bg-slate-50 p-4 rounded-xl border border-slate-200 hover:bg-white hover:shadow-sm transition-all mb-3">
                      <div className="flex justify-between items-start">
                         <div>
                           <div className="flex items-center gap-2 mb-1">

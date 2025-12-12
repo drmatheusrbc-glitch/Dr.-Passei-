@@ -354,6 +354,31 @@ export default function App() {
     updateSinglePlan(updatedPlan);
   };
 
+  const handleResetProgress = () => {
+    if (!selectedPlan) return;
+    
+    // Clear study sessions history (chart data)
+    // Clear completed revisions
+    // Reset topic counters
+    const updatedPlan = {
+      ...selectedPlan,
+      studySessions: [],
+      subjects: selectedPlan.subjects.map(subject => ({
+        ...subject,
+        topics: subject.topics.map(topic => ({
+          ...topic,
+          questionsTotal: 0,
+          questionsCorrect: 0,
+          // Keep only pending revisions (not completed)
+          // If you want to delete ALL revisions including scheduled ones, remove the filter and return []
+          revisions: topic.revisions.filter(r => !r.isCompleted) 
+        }))
+      }))
+    };
+
+    updateSinglePlan(updatedPlan);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -519,6 +544,7 @@ export default function App() {
               onRegisterSession={handleRegisterSession}
               onCompleteRevision={handleCompleteRevision}
               onDeleteRevision={handleDeleteRevision}
+              onResetProgress={handleResetProgress}
             />
           )}
           {currentView === 'calendar' && (
