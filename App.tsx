@@ -342,8 +342,23 @@ export default function App() {
             ...subject,
             topics: subject.topics.map(topic => {
               if (topic.id === topicId) {
+                // Find the revision to get stats before deleting
+                const revisionToDelete = topic.revisions.find(r => r.id === revisionId);
+                let newTotal = topic.questionsTotal;
+                let newCorrect = topic.questionsCorrect;
+
+                // Subtract stats if the revision was completed
+                if (revisionToDelete && revisionToDelete.isCompleted) {
+                   const revTotal = revisionToDelete.questionsTotal || 0;
+                   const revCorrect = revisionToDelete.questionsCorrect || 0;
+                   newTotal = Math.max(0, newTotal - revTotal);
+                   newCorrect = Math.max(0, newCorrect - revCorrect);
+                }
+
                 return {
                   ...topic,
+                  questionsTotal: newTotal,
+                  questionsCorrect: newCorrect,
                   revisions: topic.revisions.filter(r => r.id !== revisionId)
                 };
               }
@@ -361,6 +376,9 @@ export default function App() {
   const handleResetProgress = () => {
     if (!selectedPlan) return;
     
+    // Clear study sessions history (chart data)
+    // Clear completed revisions
+    // Reset topic counters
     const updatedPlan = {
       ...selectedPlan,
       studySessions: [],
@@ -370,6 +388,7 @@ export default function App() {
           ...topic,
           questionsTotal: 0,
           questionsCorrect: 0,
+          // Keep only pending revisions (not completed)
           revisions: topic.revisions.filter(r => !r.isCompleted) 
         }))
       }))
