@@ -30,15 +30,26 @@ export interface StudySession {
   questionsCorrect: number;
 }
 
+export interface MockExam {
+  id: string;
+  institution: string;
+  year: number;
+  questionsTotal: number;
+  questionsCorrect: number;
+  duration: string; // e.g. "04:30"
+  date: string;
+}
+
 export interface Plan {
   id: string;
   name: string;
   createdAt: string;
   subjects: Subject[];
   studySessions: StudySession[]; // History for charts
+  mockExams?: MockExam[]; // New field for mock exams
 }
 
-export type ViewState = 'dashboard' | 'subjects' | 'questions' | 'schedule' | 'statistics' | 'calendar' | 'settings';
+export type ViewState = 'dashboard' | 'subjects' | 'questions' | 'schedule' | 'statistics' | 'calendar' | 'settings' | 'mock-exams';
 
 export interface PlanStats {
   totalSubjects: number;

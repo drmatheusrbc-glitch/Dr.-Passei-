@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plan, ViewState, PlanStats } from './types';
+import { Plan, ViewState, PlanStats, MockExam } from './types';
 import { PlanSelection } from './components/PlanSelection';
 import { PlanDashboard } from './components/PlanDashboard';
 import { SubjectsManager } from './components/SubjectsManager';
@@ -7,7 +7,8 @@ import { QuestionsManager } from './components/QuestionsManager';
 import { StatisticsDashboard } from './components/StatisticsDashboard';
 import { CalendarView } from './components/CalendarView';
 import { SettingsView } from './components/SettingsView';
-import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, Calendar as CalendarIcon, Settings, Menu, ChevronLeft } from 'lucide-react';
+import { MockExamsManager } from './components/MockExamsManager'; // Import
+import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, Calendar as CalendarIcon, Settings, Menu, ChevronLeft, ClipboardList } from 'lucide-react';
 import { storageService } from './services/storage';
 
 export default function App() {
@@ -56,6 +57,7 @@ export default function App() {
     let totalQuestions = 0;
     let totalCorrect = 0;
 
+    // Calculate from Subjects/Topics
     selectedPlan.subjects.forEach(subject => {
       subject.topics.forEach(topic => {
         totalTopics++;
@@ -63,6 +65,14 @@ export default function App() {
         totalCorrect += topic.questionsCorrect;
       });
     });
+
+    // Calculate from Mock Exams (Simulados)
+    if (selectedPlan.mockExams) {
+      selectedPlan.mockExams.forEach(exam => {
+        totalQuestions += exam.questionsTotal;
+        totalCorrect += exam.questionsCorrect;
+      });
+    }
 
     const accuracy = totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
 
@@ -82,7 +92,8 @@ export default function App() {
       name,
       createdAt: new Date().toISOString(),
       subjects: [],
-      studySessions: []
+      studySessions: [],
+      mockExams: []
     };
     
     setPlans(prev => [...prev, newPlan]);
@@ -382,6 +393,8 @@ export default function App() {
     const updatedPlan = {
       ...selectedPlan,
       studySessions: [],
+      // Also clear mock exams
+      mockExams: [],
       subjects: selectedPlan.subjects.map(subject => ({
         ...subject,
         topics: subject.topics.map(topic => ({
@@ -392,6 +405,47 @@ export default function App() {
           revisions: topic.revisions.filter(r => !r.isCompleted) 
         }))
       }))
+    };
+
+    updateSinglePlan(updatedPlan);
+  };
+
+  // --- Mock Exam Actions ---
+
+  const handleCreateMockExam = (institution: string, year: number, total: number, correct: number, duration: string) => {
+    if (!selectedPlan) return;
+
+    const newMock: MockExam = {
+      id: crypto.randomUUID(),
+      institution,
+      year,
+      questionsTotal: total,
+      questionsCorrect: correct,
+      duration,
+      date: new Date().toISOString()
+    };
+
+    const newSession = {
+      date: new Date().toISOString(),
+      questionsTotal: total,
+      questionsCorrect: correct
+    };
+
+    const updatedPlan = {
+      ...selectedPlan,
+      studySessions: [...(selectedPlan.studySessions || []), newSession],
+      mockExams: [...(selectedPlan.mockExams || []), newMock]
+    };
+
+    updateSinglePlan(updatedPlan);
+  };
+
+  const handleDeleteMockExam = (id: string) => {
+    if (!selectedPlan) return;
+
+    const updatedPlan = {
+      ...selectedPlan,
+      mockExams: (selectedPlan.mockExams || []).filter(e => e.id !== id)
     };
 
     updateSinglePlan(updatedPlan);
@@ -479,6 +533,18 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setCurrentView('mock-exams')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              currentView === 'mock-exams' 
+                ? 'bg-medical-50 text-medical-700' 
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <ClipboardList className="w-5 h-5" />
+            Simulados
+          </button>
+
+          <button
             onClick={() => setCurrentView('calendar')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               currentView === 'calendar' 
@@ -551,7 +617,7 @@ export default function App() {
             
             <div>
               <h1 className="text-2xl font-bold text-slate-800">
-                {currentView === 'settings' ? 'Configurações' : selectedPlan.name}
+                {currentView === 'settings' ? 'Configurações' : currentView === 'mock-exams' ? 'Simulados' : selectedPlan.name}
               </h1>
               <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
                 {planStats && currentView !== 'settings' && (
@@ -600,6 +666,13 @@ export default function App() {
               onCompleteRevision={handleCompleteRevision}
               onDeleteRevision={handleDeleteRevision}
               onResetProgress={handleResetProgress}
+            />
+          )}
+          {currentView === 'mock-exams' && (
+            <MockExamsManager 
+              plan={selectedPlan}
+              onCreateMockExam={handleCreateMockExam}
+              onDeleteMockExam={handleDeleteMockExam}
             />
           )}
           {currentView === 'calendar' && (
