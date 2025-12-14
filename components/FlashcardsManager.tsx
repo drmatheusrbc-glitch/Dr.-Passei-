@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Plan, FlashcardDeck, FlashcardSubDeck, Flashcard } from '../types';
-import { Layers, Plus, Play, BookOpen, Search, Trash2, Check, X, RotateCw, Image, Video, Mic, ChevronDown, ChevronRight, ArrowRight, Save } from 'lucide-react';
+import { Layers, Plus, Play, BookOpen, Search, Trash2, Check, X, RotateCw, Image, Video, Mic, ChevronDown, ChevronRight, ArrowRight, Save, Upload, Link as LinkIcon, FileUp } from 'lucide-react';
 
 interface FlashcardsManagerProps {
   plan: Plan;
@@ -9,6 +9,7 @@ interface FlashcardsManagerProps {
 
 type Tab = 'study' | 'create' | 'library';
 type MediaType = 'image' | 'video' | 'audio' | null;
+type InputSource = 'url' | 'file';
 type StudyMode = 'training' | 'game';
 
 export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUpdatePlan }) => {
@@ -24,7 +25,10 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
   const [cardAnswer, setCardAnswer] = useState('');
   const [cardMediaUrl, setCardMediaUrl] = useState('');
   const [cardMediaType, setCardMediaType] = useState<MediaType>(null);
+  const [mediaSource, setMediaSource] = useState<InputSource>('url');
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Study State ---
   const [studyDeckId, setStudyDeckId] = useState('');
@@ -84,6 +88,24 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     setSelectedSubDeckId(newSubDeck.id); // Auto select
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Limit file size to 5MB to prevent performance issues with LocalStorage/Base64
+    if (file.size > 5 * 1024 * 1024) {
+      alert("O arquivo é muito grande (Limite: 5MB). Para arquivos maiores, use um Link URL.");
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCardMediaUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCreateCard = () => {
     if (!selectedDeckId || !selectedSubDeckId || !cardQuestion.trim() || !cardAnswer.trim()) {
       alert("Selecione Deck, Sub-deck, Pergunta e Resposta.");
@@ -123,6 +145,9 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     setCardAnswer('');
     setCardMediaUrl('');
     setCardMediaType(null);
+    setMediaSource('url');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    
     setCreateSuccess("Flashcard criado com sucesso!");
     setTimeout(() => setCreateSuccess(null), 3000);
   };
@@ -539,20 +564,84 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
 
                     <div>
                        <label className="block text-sm font-medium text-slate-700 mb-2">Mídia (Opcional)</label>
-                       <div className="flex gap-4 items-center bg-slate-50 p-3 rounded-lg border border-slate-200">
-                          <div className="flex gap-2">
-                             <button onClick={() => setCardMediaType('image')} className={`p-2 rounded ${cardMediaType === 'image' ? 'bg-medical-200 text-medical-800' : 'bg-white text-slate-500'}`}><Image className="w-5 h-5"/></button>
-                             <button onClick={() => setCardMediaType('video')} className={`p-2 rounded ${cardMediaType === 'video' ? 'bg-medical-200 text-medical-800' : 'bg-white text-slate-500'}`}><Video className="w-5 h-5"/></button>
-                             <button onClick={() => setCardMediaType('audio')} className={`p-2 rounded ${cardMediaType === 'audio' ? 'bg-medical-200 text-medical-800' : 'bg-white text-slate-500'}`}><Mic className="w-5 h-5"/></button>
+                       
+                       <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                          {/* Type Selector */}
+                          <div className="flex gap-2 mb-3">
+                             <button 
+                                onClick={() => { setCardMediaType('image'); setCardMediaUrl(''); }} 
+                                className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${cardMediaType === 'image' ? 'bg-medical-200 text-medical-800 border border-medical-300' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                             >
+                                <Image className="w-4 h-4"/> Imagem
+                             </button>
+                             <button 
+                                onClick={() => { setCardMediaType('video'); setCardMediaUrl(''); }}
+                                className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${cardMediaType === 'video' ? 'bg-medical-200 text-medical-800 border border-medical-300' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                             >
+                                <Video className="w-4 h-4"/> Vídeo
+                             </button>
+                             <button 
+                                onClick={() => { setCardMediaType('audio'); setCardMediaUrl(''); }}
+                                className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${cardMediaType === 'audio' ? 'bg-medical-200 text-medical-800 border border-medical-300' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                             >
+                                <Mic className="w-4 h-4"/> Áudio
+                             </button>
                           </div>
-                          <input 
-                            type="text" 
-                            className="flex-1 bg-white border border-slate-300 rounded px-3 py-2 text-sm"
-                            placeholder={cardMediaType ? "Cole a URL da mídia aqui..." : "Selecione um tipo de mídia..."}
-                            value={cardMediaUrl}
-                            onChange={(e) => setCardMediaUrl(e.target.value)}
-                            disabled={!cardMediaType}
-                          />
+
+                          {/* Source Toggle & Input */}
+                          {cardMediaType && (
+                             <div className="animate-fade-in">
+                                <div className="flex gap-4 mb-3 border-b border-slate-200 pb-2">
+                                  <button 
+                                    onClick={() => { setMediaSource('url'); setCardMediaUrl(''); }}
+                                    className={`text-xs font-bold uppercase tracking-wide pb-1 ${mediaSource === 'url' ? 'text-medical-600 border-b-2 border-medical-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                  >
+                                    Link (URL)
+                                  </button>
+                                  <button 
+                                    onClick={() => { setMediaSource('file'); setCardMediaUrl(''); }}
+                                    className={`text-xs font-bold uppercase tracking-wide pb-1 ${mediaSource === 'file' ? 'text-medical-600 border-b-2 border-medical-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                  >
+                                    Upload de Arquivo
+                                  </button>
+                                </div>
+
+                                {mediaSource === 'url' ? (
+                                   <div className="flex items-center gap-2">
+                                      <LinkIcon className="w-4 h-4 text-slate-400" />
+                                      <input 
+                                        type="text" 
+                                        className="flex-1 bg-white border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-medical-500"
+                                        placeholder={`Cole a URL do ${cardMediaType === 'image' ? 'imagem' : cardMediaType === 'video' ? 'vídeo' : 'áudio'}...`}
+                                        value={cardMediaUrl}
+                                        onChange={(e) => setCardMediaUrl(e.target.value)}
+                                      />
+                                   </div>
+                                ) : (
+                                   <div className="flex items-center gap-2">
+                                      <label className="flex-1 cursor-pointer">
+                                         <div className="flex items-center justify-center gap-2 w-full bg-white border border-dashed border-slate-300 rounded-lg py-3 text-slate-500 hover:bg-slate-50 hover:border-medical-400 hover:text-medical-600 transition-colors">
+                                            <Upload className="w-4 h-4" />
+                                            <span className="text-sm font-medium">Clique para escolher o arquivo</span>
+                                         </div>
+                                         <input 
+                                           ref={fileInputRef}
+                                           type="file" 
+                                           className="hidden"
+                                           accept={cardMediaType === 'image' ? 'image/*' : cardMediaType === 'video' ? 'video/*' : 'audio/*'}
+                                           onChange={handleFileUpload}
+                                         />
+                                      </label>
+                                   </div>
+                                )}
+                                
+                                {cardMediaUrl && mediaSource === 'file' && (
+                                   <div className="mt-2 text-xs text-emerald-600 font-medium flex items-center gap-1">
+                                      <Check className="w-3 h-3" /> Arquivo carregado com sucesso
+                                   </div>
+                                )}
+                             </div>
+                          )}
                        </div>
                     </div>
 
