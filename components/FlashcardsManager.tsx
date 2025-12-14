@@ -207,6 +207,12 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     setExpandedDecks(newSet);
   };
 
+  const getYouTubeId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
   // --- Study Logic ---
 
   const startStudy = () => {
@@ -293,10 +299,25 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                     </h3>
                     
                     {card.mediaUrl && (
-                      <div className="mt-6 max-h-48 overflow-hidden rounded-lg border border-slate-100 shadow-sm">
-                        {card.mediaType === 'image' && <img src={card.mediaUrl} alt="media" className="h-48 object-contain" />}
-                        {card.mediaType === 'video' && <video src={card.mediaUrl} controls className="h-48" />}
-                        {card.mediaType === 'audio' && <audio src={card.mediaUrl} controls className="mt-4" />}
+                      <div className="mt-6 w-full max-h-60 flex justify-center overflow-hidden rounded-lg border border-slate-100 shadow-sm bg-slate-50">
+                        {card.mediaType === 'image' && <img src={card.mediaUrl} alt="media" className="h-48 md:h-60 object-contain" />}
+                        
+                        {card.mediaType === 'video' && (() => {
+                           const ytId = getYouTubeId(card.mediaUrl || '');
+                           if (ytId) {
+                             return (
+                               <iframe 
+                                 src={`https://www.youtube.com/embed/${ytId}`}
+                                 className="w-full h-48 md:h-60"
+                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                 allowFullScreen
+                               />
+                             );
+                           }
+                           return <video src={card.mediaUrl} controls className="h-48 md:h-60" />;
+                        })()}
+
+                        {card.mediaType === 'audio' && <audio src={card.mediaUrl} controls className="mt-4 w-full px-4" />}
                       </div>
                     )}
                   </div>
