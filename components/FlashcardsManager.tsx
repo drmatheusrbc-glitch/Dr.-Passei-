@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Plan, FlashcardDeck, FlashcardSubDeck, Flashcard } from '../types';
-import { Layers, Plus, Play, BookOpen, Search, Trash2, Check, X, RotateCw, Image, Video, Mic, ChevronDown, ChevronRight, ArrowRight, Save, Upload, Link as LinkIcon, FileUp } from 'lucide-react';
+import { Layers, Plus, Play, BookOpen, Search, Trash2, Check, X, RotateCw, Image, ChevronDown, ChevronRight, ArrowRight, Save, Upload, Link as LinkIcon } from 'lucide-react';
 
 interface FlashcardsManagerProps {
   plan: Plan;
@@ -8,7 +8,6 @@ interface FlashcardsManagerProps {
 }
 
 type Tab = 'study' | 'create' | 'library';
-type MediaType = 'image' | 'video' | 'audio' | null;
 type InputSource = 'url' | 'file';
 type StudyMode = 'training' | 'game';
 
@@ -24,7 +23,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
   const [cardQuestion, setCardQuestion] = useState('');
   const [cardAnswer, setCardAnswer] = useState('');
   const [cardMediaUrl, setCardMediaUrl] = useState('');
-  const [cardMediaType, setCardMediaType] = useState<MediaType>(null);
+  const [hasMedia, setHasMedia] = useState(false);
   const [mediaSource, setMediaSource] = useState<InputSource>('url');
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
   
@@ -92,9 +91,9 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit file size to 5MB to prevent performance issues with LocalStorage/Base64
+    // Limit file size to 5MB
     if (file.size > 5 * 1024 * 1024) {
-      alert("O arquivo é muito grande (Limite: 5MB). Para arquivos maiores, use um Link URL.");
+      alert("A imagem é muito grande (Limite: 5MB). Para arquivos maiores, use um Link URL.");
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -116,8 +115,8 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
       id: crypto.randomUUID(),
       question: cardQuestion,
       answer: cardAnswer,
-      mediaUrl: cardMediaUrl.trim() || undefined,
-      mediaType: cardMediaUrl.trim() ? (cardMediaType || 'image') : undefined,
+      mediaUrl: (hasMedia && cardMediaUrl.trim()) ? cardMediaUrl.trim() : undefined,
+      mediaType: (hasMedia && cardMediaUrl.trim()) ? 'image' : undefined,
       box: 0
     };
 
@@ -144,7 +143,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     setCardQuestion('');
     setCardAnswer('');
     setCardMediaUrl('');
-    setCardMediaType(null);
+    setHasMedia(false);
     setMediaSource('url');
     if (fileInputRef.current) fileInputRef.current.value = '';
     
@@ -205,12 +204,6 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     if (newSet.has(deckId)) newSet.delete(deckId);
     else newSet.add(deckId);
     setExpandedDecks(newSet);
-  };
-
-  const getYouTubeId = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
   };
 
   // --- Study Logic ---
@@ -300,24 +293,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                     
                     {card.mediaUrl && (
                       <div className="mt-6 w-full max-h-60 flex justify-center overflow-hidden rounded-lg border border-slate-100 shadow-sm bg-slate-50">
-                        {card.mediaType === 'image' && <img src={card.mediaUrl} alt="media" className="h-48 md:h-60 object-contain" />}
-                        
-                        {card.mediaType === 'video' && (() => {
-                           const ytId = getYouTubeId(card.mediaUrl || '');
-                           if (ytId) {
-                             return (
-                               <iframe 
-                                 src={`https://www.youtube.com/embed/${ytId}`}
-                                 className="w-full h-48 md:h-60"
-                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                 allowFullScreen
-                               />
-                             );
-                           }
-                           return <video src={card.mediaUrl} controls className="h-48 md:h-60" />;
-                        })()}
-
-                        {card.mediaType === 'audio' && <audio src={card.mediaUrl} controls className="mt-4 w-full px-4" />}
+                        <img src={card.mediaUrl} alt="media" className="h-48 md:h-60 object-contain" />
                       </div>
                     )}
                   </div>
@@ -584,33 +560,21 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                     </div>
 
                     <div>
-                       <label className="block text-sm font-medium text-slate-700 mb-2">Mídia (Opcional)</label>
+                       <label className="block text-sm font-medium text-slate-700 mb-2">Imagem (Opcional)</label>
                        
                        <div className="space-y-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                          {/* Type Selector */}
-                          <div className="flex gap-2 mb-3">
+                          {/* Type Selector Toggle */}
+                          <div className="mb-3">
                              <button 
-                                onClick={() => { setCardMediaType('image'); setCardMediaUrl(''); }} 
-                                className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${cardMediaType === 'image' ? 'bg-medical-200 text-medical-800 border border-medical-300' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                                onClick={() => { setHasMedia(!hasMedia); setCardMediaUrl(''); }} 
+                                className={`w-full py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${hasMedia ? 'bg-medical-200 text-medical-800 border border-medical-300' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
                              >
-                                <Image className="w-4 h-4"/> Imagem
-                             </button>
-                             <button 
-                                onClick={() => { setCardMediaType('video'); setCardMediaUrl(''); }}
-                                className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${cardMediaType === 'video' ? 'bg-medical-200 text-medical-800 border border-medical-300' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
-                             >
-                                <Video className="w-4 h-4"/> Vídeo
-                             </button>
-                             <button 
-                                onClick={() => { setCardMediaType('audio'); setCardMediaUrl(''); }}
-                                className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${cardMediaType === 'audio' ? 'bg-medical-200 text-medical-800 border border-medical-300' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
-                             >
-                                <Mic className="w-4 h-4"/> Áudio
+                                <Image className="w-4 h-4"/> {hasMedia ? 'Remover Imagem' : 'Adicionar Imagem'}
                              </button>
                           </div>
 
                           {/* Source Toggle & Input */}
-                          {cardMediaType && (
+                          {hasMedia && (
                              <div className="animate-fade-in">
                                 <div className="flex gap-4 mb-3 border-b border-slate-200 pb-2">
                                   <button 
@@ -623,7 +587,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                                     onClick={() => { setMediaSource('file'); setCardMediaUrl(''); }}
                                     className={`text-xs font-bold uppercase tracking-wide pb-1 ${mediaSource === 'file' ? 'text-medical-600 border-b-2 border-medical-600' : 'text-slate-400 hover:text-slate-600'}`}
                                   >
-                                    Upload de Arquivo
+                                    Upload de Imagem
                                   </button>
                                 </div>
 
@@ -633,7 +597,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                                       <input 
                                         type="text" 
                                         className="flex-1 bg-white border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-medical-500"
-                                        placeholder={`Cole a URL do ${cardMediaType === 'image' ? 'imagem' : cardMediaType === 'video' ? 'vídeo' : 'áudio'}...`}
+                                        placeholder="Cole a URL da imagem..."
                                         value={cardMediaUrl}
                                         onChange={(e) => setCardMediaUrl(e.target.value)}
                                       />
@@ -649,7 +613,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                                            ref={fileInputRef}
                                            type="file" 
                                            className="hidden"
-                                           accept={cardMediaType === 'image' ? 'image/*' : cardMediaType === 'video' ? 'video/*' : 'audio/*'}
+                                           accept="image/*"
                                            onChange={handleFileUpload}
                                          />
                                       </label>
