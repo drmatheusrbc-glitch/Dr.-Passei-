@@ -7,8 +7,9 @@ import { QuestionsManager } from './components/QuestionsManager';
 import { StatisticsDashboard } from './components/StatisticsDashboard';
 import { CalendarView } from './components/CalendarView';
 import { SettingsView } from './components/SettingsView';
-import { MockExamsManager } from './components/MockExamsManager'; // Import
-import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, Calendar as CalendarIcon, Settings, Menu, ChevronLeft, ClipboardList } from 'lucide-react';
+import { MockExamsManager } from './components/MockExamsManager';
+import { FlashcardsManager } from './components/FlashcardsManager'; // Import
+import { LayoutDashboard, Book, LogOut, FileText, PieChart, Loader2, Cloud, Calendar as CalendarIcon, Settings, Menu, ChevronLeft, ClipboardList, Layers } from 'lucide-react';
 import { storageService } from './services/storage';
 
 export default function App() {
@@ -93,7 +94,8 @@ export default function App() {
       createdAt: new Date().toISOString(),
       subjects: [],
       studySessions: [],
-      mockExams: []
+      mockExams: [],
+      flashcardDecks: []
     };
     
     setPlans(prev => [...prev, newPlan]);
@@ -395,6 +397,8 @@ export default function App() {
       studySessions: [],
       // Also clear mock exams
       mockExams: [],
+      // Clear Flashcards if desired? Let's keep cards but maybe reset SRS. 
+      // For now, resetProgress just clears traditional question history as per previous logic.
       subjects: selectedPlan.subjects.map(subject => ({
         ...subject,
         topics: subject.topics.map(topic => ({
@@ -545,6 +549,18 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setCurrentView('flashcards')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              currentView === 'flashcards' 
+                ? 'bg-medical-50 text-medical-700' 
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Layers className="w-5 h-5" />
+            Flashcards
+          </button>
+
+          <button
             onClick={() => setCurrentView('calendar')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               currentView === 'calendar' 
@@ -617,7 +633,10 @@ export default function App() {
             
             <div>
               <h1 className="text-2xl font-bold text-slate-800">
-                {currentView === 'settings' ? 'Configurações' : currentView === 'mock-exams' ? 'Simulados' : selectedPlan.name}
+                {currentView === 'settings' ? 'Configurações' : 
+                 currentView === 'mock-exams' ? 'Simulados' : 
+                 currentView === 'flashcards' ? 'Flashcards' :
+                 selectedPlan.name}
               </h1>
               <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
                 {planStats && currentView !== 'settings' && (
@@ -673,6 +692,12 @@ export default function App() {
               plan={selectedPlan}
               onCreateMockExam={handleCreateMockExam}
               onDeleteMockExam={handleDeleteMockExam}
+            />
+          )}
+          {currentView === 'flashcards' && (
+            <FlashcardsManager 
+              plan={selectedPlan}
+              onUpdatePlan={updateSinglePlan}
             />
           )}
           {currentView === 'calendar' && (

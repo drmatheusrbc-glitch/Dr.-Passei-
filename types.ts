@@ -40,16 +40,42 @@ export interface MockExam {
   date: string;
 }
 
+// --- Flashcards Types ---
+
+export interface Flashcard {
+  id: string;
+  question: string;
+  answer: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'audio';
+  // SRS Fields (Simple implementation)
+  box: number; // 0 to 5
+  lastReviewed?: string;
+}
+
+export interface FlashcardSubDeck {
+  id: string;
+  name: string;
+  cards: Flashcard[];
+}
+
+export interface FlashcardDeck {
+  id: string;
+  name: string;
+  subDecks: FlashcardSubDeck[];
+}
+
 export interface Plan {
   id: string;
   name: string;
   createdAt: string;
   subjects: Subject[];
   studySessions: StudySession[]; // History for charts
-  mockExams?: MockExam[]; // New field for mock exams
+  mockExams?: MockExam[]; // Mock exams
+  flashcardDecks?: FlashcardDeck[]; // Flashcards system
 }
 
-export type ViewState = 'dashboard' | 'subjects' | 'questions' | 'schedule' | 'statistics' | 'calendar' | 'settings' | 'mock-exams';
+export type ViewState = 'dashboard' | 'subjects' | 'questions' | 'schedule' | 'statistics' | 'calendar' | 'settings' | 'mock-exams' | 'flashcards';
 
 export interface PlanStats {
   totalSubjects: number;
