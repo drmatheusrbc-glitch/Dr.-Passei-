@@ -208,6 +208,22 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     onUpdatePlan(updatedPlan);
   };
 
+  const handleDeleteSubDeck = (deckId: string, subDeckId: string) => {
+    if (!window.confirm("Tem certeza que deseja excluir este tópico e todos os seus cards?")) return;
+
+    const updatedPlan = {
+      ...plan,
+      flashcardDecks: decks.map(d => {
+        if (d.id !== deckId) return d;
+        return {
+          ...d,
+          subDecks: d.subDecks.filter(sd => sd.id !== subDeckId)
+        };
+      })
+    };
+    onUpdatePlan(updatedPlan);
+  };
+
   const handleStartEdit = (deckId: string, subDeckId: string, card: Flashcard) => {
     setEditingCard({ deckId, subDeckId, card });
     setEditQ(card.question);
@@ -716,6 +732,13 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                            >
                              Estudar
                            </button>
+                           <button
+                             onClick={() => handleDeleteSubDeck(deck.id, sd.id)}
+                             className="text-slate-400 hover:text-red-600 p-1 hover:bg-red-50 rounded transition-colors"
+                             title="Excluir Tópico"
+                           >
+                             <Trash2 className="w-4 h-4" />
+                           </button>
                         </div>
                       </div>
                     );
@@ -827,6 +850,17 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                                            <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                                               {cardsToShow.length} cards
                                            </span>
+                                           
+                                           <button
+                                             onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteSubDeck(deck.id, subDeck.id);
+                                             }}
+                                             className="ml-4 text-slate-300 hover:text-red-500 p-1 rounded transition-colors hover:bg-red-50"
+                                             title="Excluir Tópico"
+                                           >
+                                              <Trash2 className="w-4 h-4" />
+                                           </button>
                                         </div>
 
                                         {/* Card Grid (Accordion Body) */}
