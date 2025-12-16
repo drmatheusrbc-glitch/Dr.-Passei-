@@ -40,7 +40,7 @@ export interface MockExam {
   date: string;
 }
 
-// --- Flashcards Types (Anki Style) ---
+// --- Flashcards Types (Custom Logic) ---
 
 export interface Flashcard {
   id: string;
@@ -49,12 +49,15 @@ export interface Flashcard {
   mediaUrl?: string;
   mediaType?: 'image';
   
-  // Anki / SM-2 Algorithm Fields
+  // Custom Logic Fields
   interval: number; // Days until next review
-  easeFactor: number; // Multiplier (starts at 2.5)
+  easeFactor: number; // Keep for compatibility
   repetitions: number; // Consecutive successful reviews
   dueDate: string; // ISO Date string for next review
   state: 'new' | 'learning' | 'review' | 'relearning';
+  
+  // New logic: Error Deck
+  isError?: boolean; // If true, appears in the global Error Deck
 }
 
 export interface FlashcardSubDeck {

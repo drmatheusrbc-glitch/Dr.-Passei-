@@ -1,25 +1,16 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Plan, FlashcardDeck, FlashcardSubDeck, Flashcard } from '../types';
-import { Layers, Plus, Play, BookOpen, Search, Trash2, Check, X, Image, ChevronDown, ChevronRight, Save, Upload, Link as LinkIcon, Clock, TrendingUp, FileUp, FileText, AlertCircle } from 'lucide-react';
+import { Layers, Plus, Play, BookOpen, Search, Trash2, Check, X, Image, ChevronDown, ChevronRight, Save, Upload, Link as LinkIcon, Clock, TrendingUp, FileUp, FileText, AlertCircle, AlertTriangle, Library, Pencil, Filter } from 'lucide-react';
 
 interface FlashcardsManagerProps {
   plan: Plan;
   onUpdatePlan: (plan: Plan) => void;
 }
 
-type Tab = 'decks' | 'create' | 'browse' | 'import';
+type Tab = 'decks' | 'create' | 'browse' | 'import' | 'library';
 type InputSource = 'url' | 'file';
-type Rating = 'again' | 'hard' | 'good' | 'easy';
-
-// Helper to calculate days difference
-const getDaysDiff = (dateString: string) => {
-  const date = new Date(dateString);
-  const today = new Date();
-  date.setHours(0, 0, 0, 0);
-  today.setHours(0, 0, 0, 0);
-  const diffTime = date.getTime() - today.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-};
+// Simplified Rating for this specific logic
+type Rating = 'correct' | 'wrong';
 
 // Helper to strip HTML (common in Anki exports)
 const stripHtml = (html: string) => {
@@ -59,69 +50,34 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
   const [isStudying, setIsStudying] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const [studyDeckName, setStudyDeckName] = useState('');
+  const [isStudyingErrorDeck, setIsStudyingErrorDeck] = useState(false);
 
-  // --- Browse State ---
+  // --- Browse/Library State ---
   const [expandedDecks, setExpandedDecks] = useState<Set<string>>(new Set());
+  const [expandedLibrarySubDecks, setExpandedLibrarySubDecks] = useState<Set<string>>(new Set()); // New state for accordion
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Edit State
+  const [editingCard, setEditingCard] = useState<{ deckId: string, subDeckId: string, card: Flashcard } | null>(null);
+  const [editQ, setEditQ] = useState('');
+  const [editA, setEditA] = useState('');
+  const [editMediaUrl, setEditMediaUrl] = useState('');
+  const [editHasMedia, setEditHasMedia] = useState(false);
+  const [editMediaSource, setEditMediaSource] = useState<InputSource>('url');
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   // Helpers
   const decks = plan.flashcardDecks || [];
   const selectedDeck = decks.find(d => d.id === selectedDeckId);
 
-  // --- Anki / SM-2 Algorithm Logic ---
-  const calculateNextReview = (card: Flashcard, rating: Rating): Flashcard => {
-    let newInterval = card.interval;
-    let newEase = card.easeFactor;
-    let newRepetitions = card.repetitions;
-    let newState = card.state;
-    
-    // Rating 1: Again (Fail)
-    if (rating === 'again') {
-      newInterval = 0; // Review today/tomorrow
-      newRepetitions = 0;
-      newState = 'learning';
-    } 
-    // Rating 2: Hard (Pass but difficult)
-    else if (rating === 'hard') {
-      newInterval = Math.max(1, Math.floor(card.interval * 1.2));
-      newEase = Math.max(1.3, card.easeFactor - 0.15);
-      newState = 'review';
-    }
-    // Rating 3: Good (Normal)
-    else if (rating === 'good') {
-      if (card.repetitions === 0) {
-        newInterval = 1;
-      } else if (card.repetitions === 1) {
-        newInterval = 6;
-      } else {
-        newInterval = Math.ceil(card.interval * card.easeFactor);
-      }
-      newRepetitions += 1;
-      newState = 'review';
-    }
-    // Rating 4: Easy
-    else if (rating === 'easy') {
-      if (card.repetitions === 0) {
-        newInterval = 4;
-      } else {
-        newInterval = Math.ceil(card.interval * card.easeFactor * 1.3);
-      }
-      newEase += 0.15;
-      newRepetitions += 1;
-      newState = 'review';
-    }
-
-    const nextDate = new Date();
-    nextDate.setDate(nextDate.getDate() + newInterval);
-
-    return {
-      ...card,
-      interval: newInterval,
-      easeFactor: newEase,
-      repetitions: newRepetitions,
-      dueDate: nextDate.toISOString(),
-      state: newState
-    };
-  };
+  // Calculate Global Error Count
+  const totalErrorCards = useMemo(() => {
+    let count = 0;
+    decks.forEach(d => d.subDecks.forEach(sd => sd.cards.forEach(c => {
+      if (c.isError) count++;
+    })));
+    return count;
+  }, [decks]);
 
   // --- Actions ---
 
@@ -179,7 +135,8 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
       easeFactor: 2.5,
       repetitions: 0,
       dueDate: new Date().toISOString(),
-      state: 'new'
+      state: 'new',
+      isError: false
     };
 
     const updatedPlan = {
@@ -223,17 +180,103 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     reader.readAsDataURL(file);
   };
 
+  // --- Library Actions ---
+
+  const handleDeleteCard = (deckId: string, subDeckId: string, cardId: string) => {
+    if (!window.confirm("Tem certeza que deseja excluir este card?")) return;
+
+    const updatedPlan = {
+      ...plan,
+      flashcardDecks: decks.map(d => {
+        if (d.id !== deckId) return d;
+        return {
+          ...d,
+          subDecks: d.subDecks.map(sd => {
+            if (sd.id !== subDeckId) return sd;
+            return {
+              ...sd,
+              cards: sd.cards.filter(c => c.id !== cardId)
+            };
+          })
+        };
+      })
+    };
+    onUpdatePlan(updatedPlan);
+  };
+
+  const handleStartEdit = (deckId: string, subDeckId: string, card: Flashcard) => {
+    setEditingCard({ deckId, subDeckId, card });
+    setEditQ(card.question);
+    setEditA(card.answer);
+    
+    // Setup Media Edit State
+    if (card.mediaUrl) {
+      setEditHasMedia(true);
+      setEditMediaUrl(card.mediaUrl);
+      setEditMediaSource('url'); // Default to URL display, though it might be base64
+    } else {
+      setEditHasMedia(false);
+      setEditMediaUrl('');
+    }
+  };
+
+  const handleEditFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Imagem muito grande (Max 5MB).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => setEditMediaUrl(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingCard) return;
+    
+    const updatedPlan = {
+      ...plan,
+      flashcardDecks: decks.map(d => {
+        if (d.id !== editingCard.deckId) return d;
+        return {
+          ...d,
+          subDecks: d.subDecks.map(sd => {
+            if (sd.id !== editingCard.subDeckId) return sd;
+            return {
+              ...sd,
+              cards: sd.cards.map(c => {
+                if (c.id !== editingCard.card.id) return c;
+                
+                // Update fields
+                return { 
+                  ...c, 
+                  question: editQ, 
+                  answer: editA,
+                  mediaUrl: (editHasMedia && editMediaUrl.trim()) ? editMediaUrl.trim() : undefined,
+                  mediaType: (editHasMedia && editMediaUrl.trim()) ? 'image' : undefined
+                };
+              })
+            };
+          })
+        };
+      })
+    };
+    onUpdatePlan(updatedPlan);
+    setEditingCard(null);
+  };
+
   // --- Import Logic ---
 
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setImportFile(file);
-      parseImportFile(file, importSeparator, shouldStripHtml);
+      parseTextImportFile(file, importSeparator, shouldStripHtml);
     }
   };
 
-  const parseImportFile = (file: File, separatorType: string, strip: boolean) => {
+  const parseTextImportFile = (file: File, separatorType: string, strip: boolean) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -273,12 +316,6 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
        alert("Selecione um Deck e defina um nome para o Tópico (Sub-deck).");
        return;
     }
-
-    // 1. Convert preview (which is just a sample) - we need to re-parse all for final import
-    // Actually, let's assume importPreview is enough if user didn't change file? 
-    // Correct approach: Parse fully again or store parsed data. For MVP, re-using parsed preview if it contains all (slice limit above)
-    // Let's re-read simply to be safe or just use the preview if file is small.
-    // For safety, let's use the fileReader again to get ALL lines.
     
     if (!importFile) return;
 
@@ -311,7 +348,8 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                 easeFactor: 2.5,
                 repetitions: 0,
                 dueDate: new Date().toISOString(),
-                state: 'new'
+                state: 'new',
+                isError: false
              });
           }
         }
@@ -322,7 +360,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
         return;
       }
 
-      // 2. Add to Plan
+      // Add to Plan
       const newSubDeck: FlashcardSubDeck = {
         id: crypto.randomUUID(),
         name: targetSubDeckName,
@@ -355,6 +393,28 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
   };
 
   // --- Study Logic ---
+
+  const startStudyErrorDeck = () => {
+     let errorCards: Flashcard[] = [];
+     decks.forEach(d => d.subDecks.forEach(sd => sd.cards.forEach(c => {
+       if (c.isError) errorCards.push(c);
+     })));
+
+     if (errorCards.length === 0) {
+       alert("Parabéns! Você não tem cards marcados com erro.");
+       return;
+     }
+
+     // Shuffle
+     errorCards = errorCards.sort(() => Math.random() - 0.5);
+
+     setStudyQueue(errorCards);
+     setCurrentCardIndex(0);
+     setIsFlipped(false);
+     setStudyDeckName("⚠️ Deck de Erros");
+     setIsStudyingErrorDeck(true);
+     setIsStudying(true);
+  };
 
   const startStudySession = (deckId: string, subDeckId?: string) => {
     let cardsToStudy: Flashcard[] = [];
@@ -390,12 +450,29 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     setCurrentCardIndex(0);
     setIsFlipped(false);
     setStudyDeckName(subDeckId ? (deck.subDecks.find(s=>s.id===subDeckId)?.name || deck.name) : deck.name);
+    setIsStudyingErrorDeck(false);
     setIsStudying(true);
   };
 
   const handleRateCard = (rating: Rating) => {
     const currentCard = studyQueue[currentCardIndex];
-    const updatedCard = calculateNextReview(currentCard, rating);
+    let updatedCard = { ...currentCard };
+    
+    const nextDay = new Date();
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    if (isStudyingErrorDeck) {
+       if (rating === 'correct') {
+          updatedCard.isError = false;
+       } 
+    } else {
+       if (rating === 'correct') {
+          updatedCard.dueDate = nextDay.toISOString();
+       } else {
+          updatedCard.isError = true;
+          updatedCard.dueDate = nextDay.toISOString(); 
+       }
+    }
 
     // Update Plan with new card data
     const updatedPlan = {
@@ -410,17 +487,11 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     };
     onUpdatePlan(updatedPlan);
 
-    // If "Again", re-queue card at the end of this session
-    if (rating === 'again') {
-       setStudyQueue(prev => [...prev, updatedCard]);
-    }
-
-    // Move to next
     if (currentCardIndex < studyQueue.length - 1) {
       setCurrentCardIndex(prev => prev + 1);
       setIsFlipped(false);
     } else {
-      alert("Revisão finalizada! Todos os cards pendentes foram estudados.");
+      alert("Sessão finalizada!");
       setIsStudying(false);
     }
   };
@@ -431,12 +502,129 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     else newSet.add(deckId);
     setExpandedDecks(newSet);
   };
+  
+  const toggleExpandSubDeck = (subDeckId: string) => {
+    const newSet = new Set(expandedLibrarySubDecks);
+    if (newSet.has(subDeckId)) newSet.delete(subDeckId);
+    else newSet.add(subDeckId);
+    setExpandedLibrarySubDecks(newSet);
+  };
 
   // --- Render Components ---
+  const renderStudy = () => {
+    const card = studyQueue[currentCardIndex];
+    if (!card) return <div>Erro: Card não encontrado.</div>;
+
+    return (
+      <div className="max-w-3xl mx-auto h-[80vh] flex flex-col animate-fade-in">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-800">{studyDeckName}</h2>
+            {isStudyingErrorDeck && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Modo Erros</span>}
+          </div>
+          <div className="text-sm font-medium text-slate-500">
+            Card {currentCardIndex + 1} de {studyQueue.length}
+          </div>
+        </div>
+
+        {/* Card Area */}
+        <div 
+          className="flex-1 bg-white rounded-2xl shadow-lg border border-slate-200 flex flex-col relative overflow-hidden"
+          style={{ perspective: '1000px' }}
+        >
+           {/* Content Container */}
+           <div className="flex-1 p-8 flex flex-col items-center justify-center text-center overflow-y-auto">
+              {/* Question */}
+              <div className="w-full">
+                <span className="inline-block text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Pergunta</span>
+                <div className="text-2xl font-medium text-slate-800 mb-6 whitespace-pre-wrap">{card.question}</div>
+                
+                {card.mediaUrl && !isFlipped && (
+                   <div className="mb-6">
+                      <img src={card.mediaUrl} alt="Card Media" className="max-h-64 max-w-full rounded-lg shadow-sm mx-auto object-contain" />
+                   </div>
+                )}
+              </div>
+
+              {/* Answer (Only if flipped) */}
+              {isFlipped && (
+                <div className="w-full pt-8 mt-8 border-t border-slate-100 animate-fade-in-up">
+                   <span className="inline-block text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Resposta</span>
+                   <div className="text-xl text-slate-600 whitespace-pre-wrap">{card.answer}</div>
+                </div>
+              )}
+           </div>
+
+           {/* Controls Bar */}
+           <div className="p-6 bg-slate-50 border-t border-slate-200">
+              {!isFlipped ? (
+                 <button 
+                   onClick={() => setIsFlipped(true)}
+                   className="w-full bg-medical-600 text-white font-bold text-lg py-4 rounded-xl shadow-md hover:bg-medical-700 transition-transform active:scale-95 flex items-center justify-center gap-2"
+                 >
+                   Mostrar Resposta
+                 </button>
+              ) : (
+                 <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => handleRateCard('wrong')}
+                      className="bg-red-100 text-red-700 font-bold py-4 rounded-xl hover:bg-red-200 transition-colors flex flex-col items-center"
+                    >
+                      <span className="text-lg">Errei</span>
+                      <span className="text-xs opacity-75 font-normal">Rever amanhã</span>
+                    </button>
+                    <button 
+                      onClick={() => handleRateCard('correct')}
+                      className="bg-emerald-100 text-emerald-700 font-bold py-4 rounded-xl hover:bg-emerald-200 transition-colors flex flex-col items-center"
+                    >
+                      <span className="text-lg">Acertei</span>
+                      <span className="text-xs opacity-75 font-normal">Próxima revisão</span>
+                    </button>
+                 </div>
+              )}
+           </div>
+        </div>
+        
+        <button 
+          onClick={() => setIsStudying(false)}
+          className="mt-6 text-slate-400 hover:text-slate-600 font-medium text-sm text-center"
+        >
+          Encerrar Sessão
+        </button>
+      </div>
+    );
+  };
 
   const renderDecks = () => {
     return (
-      <div className="space-y-4 max-w-4xl mx-auto animate-fade-in">
+      <div className="space-y-6 max-w-4xl mx-auto animate-fade-in">
+        
+        {/* Special ERROR DECK */}
+        {totalErrorCards > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden shadow-sm">
+             <div className="p-5 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                   <div className="bg-red-100 p-2 rounded-full text-red-600">
+                      <AlertTriangle className="w-6 h-6" />
+                   </div>
+                   <div>
+                      <h3 className="font-bold text-red-800 text-lg">Deck de Erros</h3>
+                      <p className="text-sm text-red-600">Cards que você errou e precisa reforçar</p>
+                   </div>
+                </div>
+                <div className="flex items-center gap-4">
+                   <span className="font-bold text-xl text-red-700">{totalErrorCards} cards</span>
+                   <button 
+                      onClick={startStudyErrorDeck}
+                      className="bg-red-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-red-700 transition-colors"
+                   >
+                      Revisar Erros
+                   </button>
+                </div>
+             </div>
+          </div>
+        )}
+
         {decks.length === 0 && (
           <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
             <Layers className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -528,77 +716,234 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     );
   };
 
-  const renderStudy = () => {
-    const card = studyQueue[currentCardIndex];
-    if (!card) return <div>Erro ao carregar card.</div>;
+  const renderLibrary = () => {
+     const hasDecks = decks.length > 0;
 
-    return (
-      <div className="flex flex-col h-[calc(100vh-140px)] max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-4 px-4">
-           <h3 className="font-bold text-slate-700">{studyDeckName}</h3>
-           <div className="text-sm text-slate-500">
-             {currentCardIndex + 1} / {studyQueue.length}
-           </div>
-        </div>
-
-        {/* Card Area */}
-        <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-lg flex flex-col overflow-hidden relative">
-           {/* Front */}
-           <div className={`p-8 flex-1 flex flex-col items-center justify-center text-center overflow-y-auto ${isFlipped ? 'border-b border-slate-100 bg-slate-50' : ''}`}>
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Pergunta</span>
-              <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-6">{card.question}</h2>
-              {card.mediaUrl && (
-                 <img src={card.mediaUrl} alt="media" className="max-h-48 md:max-h-64 object-contain rounded-lg border border-slate-200" />
-              )}
-           </div>
-
-           {/* Back */}
-           {isFlipped && (
-             <div className="p-8 flex-1 flex flex-col items-center justify-center text-center bg-white animate-fade-in">
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Resposta</span>
-                <p className="text-xl md:text-2xl text-slate-700 font-medium">{card.answer}</p>
+     return (
+       <div className="max-w-5xl mx-auto animate-fade-in pb-12">
+          {/* Header & Filter */}
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
+             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                   <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                      <Library className="w-6 h-6 text-medical-600" />
+                      Biblioteca de Cards
+                   </h2>
+                   <p className="text-slate-500 text-sm">Gerencie, edite e organize todos os seus flashcards.</p>
+                </div>
+                <div className="relative w-full md:w-auto min-w-[300px]">
+                   <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                   <input 
+                      type="text" 
+                      placeholder="Buscar por pergunta ou resposta..."
+                      className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-medical-500 focus:outline-none"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                   />
+                </div>
              </div>
-           )}
-        </div>
+          </div>
 
-        {/* Controls */}
-        <div className="mt-6 px-4">
-           {!isFlipped ? (
-             <button 
-               onClick={() => setIsFlipped(true)}
-               className="w-full bg-slate-800 text-white py-4 rounded-xl font-bold text-lg hover:bg-slate-900 shadow-lg transition-transform active:scale-95"
-             >
-               Mostrar Resposta
-             </button>
-           ) : (
-             <div className="grid grid-cols-4 gap-3">
-               <button onClick={() => handleRateCard('again')} className="flex flex-col items-center p-3 bg-red-100 text-red-700 rounded-xl hover:bg-red-200 border border-red-200 transition-colors">
-                  <span className="font-bold text-sm">Errei</span>
-                  <span className="text-xs opacity-70 mt-1">&lt; 1 min</span>
-               </button>
-               <button onClick={() => handleRateCard('hard')} className="flex flex-col items-center p-3 bg-orange-100 text-orange-700 rounded-xl hover:bg-orange-200 border border-orange-200 transition-colors">
-                  <span className="font-bold text-sm">Difícil</span>
-                  <span className="text-xs opacity-70 mt-1">~ {Math.floor(Math.max(1, card.interval * 1.2))}d</span>
-               </button>
-               <button onClick={() => handleRateCard('good')} className="flex flex-col items-center p-3 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 border border-blue-200 transition-colors">
-                  <span className="font-bold text-sm">Bom</span>
-                  <span className="text-xs opacity-70 mt-1">~ {card.repetitions === 0 ? '1d' : Math.ceil(card.interval * card.easeFactor) + 'd'}</span>
-               </button>
-               <button onClick={() => handleRateCard('easy')} className="flex flex-col items-center p-3 bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 border border-emerald-200 transition-colors">
-                  <span className="font-bold text-sm">Fácil</span>
-                  <span className="text-xs opacity-70 mt-1">~ {Math.ceil(card.interval * card.easeFactor * 1.3) + 'd'}</span>
-               </button>
+          {/* Cards Structure */}
+          {!hasDecks ? (
+             <div className="text-center py-12 text-slate-400">
+                <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Sua biblioteca está vazia. Crie decks e cards primeiro.</p>
              </div>
-           )}
-        </div>
-        
-        <div className="mt-4 text-center">
-           <button onClick={() => setIsStudying(false)} className="text-slate-400 text-sm hover:text-red-500">
-             Sair da sessão
-           </button>
-        </div>
-      </div>
-    );
+          ) : (
+             <div className="space-y-4">
+                {decks.map(deck => {
+                   const isDeckExpanded = expandedDecks.has(deck.id);
+                   // Filter logic
+                   const deckHasMatch = !searchTerm || deck.subDecks.some(sd => 
+                      sd.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      sd.cards.some(c => 
+                         c.question.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         c.answer.toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                   );
+
+                   if (!deckHasMatch) return null;
+
+                   return (
+                      <div key={deck.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                         {/* Deck Header */}
+                         <div 
+                            className="bg-slate-50 p-4 flex items-center gap-3 cursor-pointer border-b border-slate-100 hover:bg-slate-100 transition-colors"
+                            onClick={() => toggleExpandDeck(deck.id)}
+                         >
+                            {isDeckExpanded || searchTerm ? <ChevronDown className="w-5 h-5 text-slate-500" /> : <ChevronRight className="w-5 h-5 text-slate-500" />}
+                            <h3 className="font-bold text-slate-800 text-lg">{deck.name}</h3>
+                            <span className="text-xs bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-500">
+                               {deck.subDecks.length} tópicos
+                            </span>
+                         </div>
+
+                         {/* Topics Accordion */}
+                         {(isDeckExpanded || searchTerm) && (
+                            <div className="bg-white">
+                               {deck.subDecks.map(subDeck => {
+                                  // Accordion State
+                                  const isSubDeckExpanded = expandedLibrarySubDecks.has(subDeck.id);
+                                  
+                                  const cardsToShow = subDeck.cards.filter(c => 
+                                     !searchTerm || 
+                                     c.question.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                     c.answer.toLowerCase().includes(searchTerm.toLowerCase())
+                                  );
+
+                                  if (searchTerm && cardsToShow.length === 0) return null;
+
+                                  return (
+                                     <div key={subDeck.id} className="border-b border-slate-50 last:border-b-0">
+                                        {/* Topic Header (Clickable Accordion) */}
+                                        <div 
+                                          onClick={() => toggleExpandSubDeck(subDeck.id)}
+                                          className="p-3 pl-8 flex items-center gap-2 cursor-pointer hover:bg-slate-50 transition-colors"
+                                        >
+                                           {isSubDeckExpanded || searchTerm ? (
+                                              <ChevronDown className="w-4 h-4 text-slate-400" />
+                                           ) : (
+                                              <ChevronRight className="w-4 h-4 text-slate-400" />
+                                           )}
+                                           <div className="w-2 h-2 rounded-full bg-medical-400"></div>
+                                           <h4 className="font-semibold text-slate-700 flex-1">{subDeck.name}</h4>
+                                           <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                                              {cardsToShow.length} cards
+                                           </span>
+                                        </div>
+
+                                        {/* Card Grid (Accordion Body) */}
+                                        {(isSubDeckExpanded || searchTerm) && (
+                                           <div className="p-4 pl-12 bg-slate-50/50 border-t border-slate-100">
+                                              {cardsToShow.length === 0 ? (
+                                                 <p className="text-sm text-slate-400 italic">Nenhum card neste tópico.</p>
+                                              ) : (
+                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {cardsToShow.map(card => (
+                                                       <div key={card.id} className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow relative group">
+                                                          {card.isError && (
+                                                             <div className="absolute top-2 right-2 text-red-500" title="Marcado como erro">
+                                                                <AlertCircle className="w-4 h-4" />
+                                                             </div>
+                                                          )}
+                                                          
+                                                          <div className="mb-3">
+                                                             <span className="text-xs font-bold uppercase text-slate-400">Pergunta</span>
+                                                             <p className="text-slate-800 font-medium line-clamp-2">{card.question}</p>
+                                                             {card.mediaUrl && <div className="mt-2 text-xs text-blue-500 flex items-center gap-1"><Image className="w-3 h-3"/> Contém Imagem</div>}
+                                                          </div>
+                                                          
+                                                          <div className="mb-4">
+                                                             <span className="text-xs font-bold uppercase text-slate-400">Resposta</span>
+                                                             <p className="text-slate-600 text-sm line-clamp-2">{card.answer}</p>
+                                                          </div>
+
+                                                          <div className="flex justify-end gap-2 pt-2 border-t border-slate-50">
+                                                             <button 
+                                                                onClick={(e) => { e.stopPropagation(); handleStartEdit(deck.id, subDeck.id, card); }}
+                                                                className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                                                             >
+                                                                <Pencil className="w-3 h-3" /> Editar
+                                                             </button>
+                                                             <button 
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteCard(deck.id, subDeck.id, card.id); }}
+                                                                className="flex items-center gap-1 text-xs font-medium text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                                             >
+                                                                <Trash2 className="w-3 h-3" /> Excluir
+                                                             </button>
+                                                          </div>
+                                                       </div>
+                                                    ))}
+                                                 </div>
+                                              )}
+                                           </div>
+                                        )}
+                                     </div>
+                                  );
+                               })}
+                               {deck.subDecks.length === 0 && (
+                                  <p className="text-sm text-slate-400 text-center py-4">Sem tópicos neste deck.</p>
+                               )}
+                            </div>
+                         )}
+                      </div>
+                   );
+                })}
+             </div>
+          )}
+
+          {/* Edit Modal */}
+          {editingCard && (
+             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 animate-fade-in max-h-[90vh] overflow-y-auto">
+                   <div className="flex justify-between items-center mb-6">
+                      <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                         <Pencil className="w-5 h-5 text-blue-600" /> Editar Card
+                      </h3>
+                      <button onClick={() => setEditingCard(null)} className="text-slate-400 hover:bg-slate-100 p-1 rounded-full">
+                         <X className="w-6 h-6" />
+                      </button>
+                   </div>
+
+                   <div className="space-y-4">
+                      <div>
+                         <label className="block text-sm font-medium text-slate-700 mb-1">Pergunta</label>
+                         <textarea 
+                            className="w-full border border-slate-300 rounded-lg p-3 h-24 focus:ring-2 focus:ring-medical-500 outline-none resize-none"
+                            value={editQ}
+                            onChange={(e) => setEditQ(e.target.value)}
+                         />
+                      </div>
+
+                      {/* Image Edit Section */}
+                      <div>
+                         <label className="block text-sm font-medium text-slate-700 mb-1">Imagem</label>
+                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                            <button onClick={() => { setEditHasMedia(!editHasMedia); if(!editHasMedia) setEditMediaUrl(''); }} className="text-sm font-medium text-slate-600 flex items-center gap-2 mb-2">
+                               <Image className="w-4 h-4" /> {editHasMedia ? 'Remover Imagem' : 'Adicionar Imagem'}
+                            </button>
+                            
+                            {editHasMedia && (
+                               <div>
+                                  <div className="flex gap-4 mb-2 border-b border-slate-200">
+                                     <button onClick={() => setEditMediaSource('url')} className={`text-xs pb-1 ${editMediaSource === 'url' ? 'font-bold text-medical-600 border-b-2 border-medical-600' : 'text-slate-500'}`}>LINK</button>
+                                     <button onClick={() => setEditMediaSource('file')} className={`text-xs pb-1 ${editMediaSource === 'file' ? 'font-bold text-medical-600 border-b-2 border-medical-600' : 'text-slate-500'}`}>UPLOAD</button>
+                                  </div>
+                                  {editMediaSource === 'url' ? (
+                                     <input type="text" className="w-full border p-2 rounded text-sm" placeholder="URL da imagem..." value={editMediaUrl} onChange={e => setEditMediaUrl(e.target.value)} />
+                                  ) : (
+                                     <input type="file" ref={editFileInputRef} accept="image/*" onChange={handleEditFileUpload} className="text-sm" />
+                                  )}
+                                  {editMediaUrl && (
+                                    <div className="mt-2">
+                                      <div className="text-xs text-emerald-600 font-medium mb-1">Pré-visualização:</div>
+                                      <img src={editMediaUrl} alt="Preview" className="max-h-32 rounded border border-slate-200" />
+                                    </div>
+                                  )}
+                               </div>
+                            )}
+                         </div>
+                      </div>
+
+                      <div>
+                         <label className="block text-sm font-medium text-slate-700 mb-1">Resposta</label>
+                         <textarea 
+                            className="w-full border border-slate-300 rounded-lg p-3 h-24 focus:ring-2 focus:ring-medical-500 outline-none resize-none"
+                            value={editA}
+                            onChange={(e) => setEditA(e.target.value)}
+                         />
+                      </div>
+                      <div className="flex justify-end pt-2 gap-3">
+                         <button onClick={() => setEditingCard(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg text-sm font-medium">Cancelar</button>
+                         <button onClick={handleSaveEdit} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm">Salvar Alterações</button>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          )}
+       </div>
+     );
   };
 
   const renderCreate = () => {
@@ -732,7 +1077,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                 {/* Config Left */}
                 <div className="space-y-4">
                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">1. Selecione o Arquivo</label>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">1. Selecione o Arquivo (.txt)</label>
                       <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 hover:border-medical-400 transition-all">
                           <div className="flex flex-col items-center justify-center pt-5 pb-6">
                               <FileText className="w-8 h-8 mb-3 text-slate-400" />
@@ -752,13 +1097,13 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                       <label className="block text-sm font-medium text-slate-700 mb-2">2. Configurações</label>
                       <div className="grid grid-cols-2 gap-4">
                          <div>
-                            <span className="text-xs font-bold text-slate-500 uppercase">Separador</span>
+                            <span className="text-xs font-bold text-slate-500 uppercase">Separador (Txt)</span>
                             <select 
                                className="w-full mt-1 border border-slate-300 rounded p-2 text-sm"
                                value={importSeparator}
                                onChange={(e) => {
                                   setImportSeparator(e.target.value);
-                                  if(importFile) parseImportFile(importFile, e.target.value, shouldStripHtml);
+                                  if(importFile) parseTextImportFile(importFile, e.target.value, shouldStripHtml);
                                }}
                             >
                                <option value="tab">Tabulação (Anki)</option>
@@ -774,7 +1119,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                                 checked={shouldStripHtml}
                                 onChange={(e) => {
                                    setShouldStripHtml(e.target.checked);
-                                   if(importFile) parseImportFile(importFile, importSeparator, e.target.checked);
+                                   if(importFile) parseTextImportFile(importFile, importSeparator, e.target.checked);
                                 }}
                                 className="w-4 h-4"
                               />
@@ -808,11 +1153,11 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
 
                 {/* Preview Right */}
                 <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 flex flex-col h-[400px]">
-                   <h3 className="text-sm font-bold text-slate-700 mb-3">Pré-visualização ({importPreview.length} cards)</h3>
+                   <h3 className="text-sm font-bold text-slate-700 mb-3">Pré-visualização</h3>
                    <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar pr-2">
                       {importPreview.length === 0 ? (
                          <div className="h-full flex items-center justify-center text-slate-400 text-sm italic">
-                            Carregue um arquivo para visualizar
+                            Carregue um arquivo de texto para visualizar
                          </div>
                       ) : (
                          importPreview.map((item, idx) => (
@@ -850,6 +1195,9 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
          <button onClick={() => setActiveTab('decks')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'decks' ? 'bg-medical-50 text-medical-700' : 'text-slate-500 hover:bg-slate-50'}`}>
             <Layers className="w-5 h-5" /> Decks
          </button>
+         <button onClick={() => setActiveTab('library')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'library' ? 'bg-medical-50 text-medical-700' : 'text-slate-500 hover:bg-slate-50'}`}>
+            <Library className="w-5 h-5" /> Biblioteca
+         </button>
          <button onClick={() => setActiveTab('create')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'create' ? 'bg-medical-50 text-medical-700' : 'text-slate-500 hover:bg-slate-50'}`}>
             <Plus className="w-5 h-5" /> Adicionar
          </button>
@@ -859,6 +1207,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
       </div>
 
       {activeTab === 'decks' && renderDecks()}
+      {activeTab === 'library' && renderLibrary()}
       {activeTab === 'create' && renderCreate()}
       {activeTab === 'import' && renderImport()}
     </div>
