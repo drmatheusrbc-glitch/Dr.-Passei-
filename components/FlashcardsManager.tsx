@@ -32,6 +32,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
   const [cardAnswer, setCardAnswer] = useState('');
   const [cardMediaUrl, setCardMediaUrl] = useState('');
   const [hasMedia, setHasMedia] = useState(false);
+  const [mediaSide, setMediaSide] = useState<'question' | 'answer'>('question'); // New state
   const [mediaSource, setMediaSource] = useState<InputSource>('url');
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,6 +64,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
   const [editA, setEditA] = useState('');
   const [editMediaUrl, setEditMediaUrl] = useState('');
   const [editHasMedia, setEditHasMedia] = useState(false);
+  const [editMediaSide, setEditMediaSide] = useState<'question' | 'answer'>('question'); // New edit state
   const [editMediaSource, setEditMediaSource] = useState<InputSource>('url');
   const editFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -131,6 +133,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
       answer: cardAnswer,
       mediaUrl: (hasMedia && cardMediaUrl.trim()) ? cardMediaUrl.trim() : undefined,
       mediaType: (hasMedia && cardMediaUrl.trim()) ? 'image' : undefined,
+      mediaSide: (hasMedia && cardMediaUrl.trim()) ? mediaSide : undefined, // Save side
       interval: 0,
       easeFactor: 2.5,
       repetitions: 0,
@@ -162,6 +165,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     setCardAnswer('');
     setCardMediaUrl('');
     setHasMedia(false);
+    setMediaSide('question'); // Reset to default
     if (fileInputRef.current) fileInputRef.current.value = '';
     
     setCreateSuccess("Card adicionado ao deck!");
@@ -213,10 +217,12 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     if (card.mediaUrl) {
       setEditHasMedia(true);
       setEditMediaUrl(card.mediaUrl);
-      setEditMediaSource('url'); // Default to URL display, though it might be base64
+      setEditMediaSource('url'); // Default to URL display
+      setEditMediaSide(card.mediaSide || 'question'); // Set existing side
     } else {
       setEditHasMedia(false);
       setEditMediaUrl('');
+      setEditMediaSide('question');
     }
   };
 
@@ -254,7 +260,8 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                   question: editQ, 
                   answer: editA,
                   mediaUrl: (editHasMedia && editMediaUrl.trim()) ? editMediaUrl.trim() : undefined,
-                  mediaType: (editHasMedia && editMediaUrl.trim()) ? 'image' : undefined
+                  mediaType: (editHasMedia && editMediaUrl.trim()) ? 'image' : undefined,
+                  mediaSide: (editHasMedia && editMediaUrl.trim()) ? editMediaSide : undefined
                 };
               })
             };
@@ -515,6 +522,9 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
     const card = studyQueue[currentCardIndex];
     if (!card) return <div>Erro: Card não encontrado.</div>;
 
+    // Default to 'question' if undefined for backward compatibility
+    const mediaSide = card.mediaSide || 'question';
+
     return (
       <div className="max-w-3xl mx-auto h-[80vh] flex flex-col animate-fade-in">
         <div className="flex justify-between items-center mb-4">
@@ -539,7 +549,7 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                 <span className="inline-block text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Pergunta</span>
                 <div className="text-2xl font-medium text-slate-800 mb-6 whitespace-pre-wrap">{card.question}</div>
                 
-                {card.mediaUrl && !isFlipped && (
+                {card.mediaUrl && mediaSide === 'question' && (
                    <div className="mb-6">
                       <img src={card.mediaUrl} alt="Card Media" className="max-h-64 max-w-full rounded-lg shadow-sm mx-auto object-contain" />
                    </div>
@@ -551,6 +561,12 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                 <div className="w-full pt-8 mt-8 border-t border-slate-100 animate-fade-in-up">
                    <span className="inline-block text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Resposta</span>
                    <div className="text-xl text-slate-600 whitespace-pre-wrap">{card.answer}</div>
+                   
+                   {card.mediaUrl && mediaSide === 'answer' && (
+                      <div className="mt-6">
+                          <img src={card.mediaUrl} alt="Card Media Answer" className="max-h-64 max-w-full rounded-lg shadow-sm mx-auto object-contain" />
+                      </div>
+                   )}
                 </div>
               )}
            </div>
@@ -910,13 +926,39 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                                      <button onClick={() => setEditMediaSource('url')} className={`text-xs pb-1 ${editMediaSource === 'url' ? 'font-bold text-medical-600 border-b-2 border-medical-600' : 'text-slate-500'}`}>LINK</button>
                                      <button onClick={() => setEditMediaSource('file')} className={`text-xs pb-1 ${editMediaSource === 'file' ? 'font-bold text-medical-600 border-b-2 border-medical-600' : 'text-slate-500'}`}>UPLOAD</button>
                                   </div>
+                                  
                                   {editMediaSource === 'url' ? (
                                      <input type="text" className="w-full border p-2 rounded text-sm" placeholder="URL da imagem..." value={editMediaUrl} onChange={e => setEditMediaUrl(e.target.value)} />
                                   ) : (
                                      <input type="file" ref={editFileInputRef} accept="image/*" onChange={handleEditFileUpload} className="text-sm" />
                                   )}
+
+                                  {/* Side Selection */}
+                                  <div className="flex gap-4 mt-3 pt-2 border-t border-slate-200">
+                                     <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                        <input 
+                                           type="radio" 
+                                           name="editMediaSide" 
+                                           checked={editMediaSide === 'question'} 
+                                           onChange={() => setEditMediaSide('question')}
+                                           className="text-medical-600 focus:ring-medical-500" 
+                                        />
+                                        Exibir na Pergunta (Frente)
+                                     </label>
+                                     <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                        <input 
+                                           type="radio" 
+                                           name="editMediaSide" 
+                                           checked={editMediaSide === 'answer'} 
+                                           onChange={() => setEditMediaSide('answer')}
+                                           className="text-medical-600 focus:ring-medical-500" 
+                                        />
+                                        Exibir na Resposta (Verso)
+                                     </label>
+                                  </div>
+
                                   {editMediaUrl && (
-                                    <div className="mt-2">
+                                    <div className="mt-3">
                                       <div className="text-xs text-emerald-600 font-medium mb-1">Pré-visualização:</div>
                                       <img src={editMediaUrl} alt="Preview" className="max-h-32 rounded border border-slate-200" />
                                     </div>
@@ -1031,6 +1073,31 @@ export const FlashcardsManager: React.FC<FlashcardsManagerProps> = ({ plan, onUp
                               ) : (
                                  <input type="file" ref={fileInputRef} accept="image/*" onChange={handleFileUpload} className="text-sm" />
                               )}
+                              
+                              {/* Side Selection */}
+                              <div className="flex gap-4 mt-3 pt-2 border-t border-slate-200">
+                                 <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                    <input 
+                                       type="radio" 
+                                       name="mediaSide" 
+                                       checked={mediaSide === 'question'} 
+                                       onChange={() => setMediaSide('question')}
+                                       className="text-medical-600 focus:ring-medical-500" 
+                                    />
+                                    Exibir na Pergunta (Frente)
+                                 </label>
+                                 <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                    <input 
+                                       type="radio" 
+                                       name="mediaSide" 
+                                       checked={mediaSide === 'answer'} 
+                                       onChange={() => setMediaSide('answer')}
+                                       className="text-medical-600 focus:ring-medical-500" 
+                                    />
+                                    Exibir na Resposta (Verso)
+                                 </label>
+                              </div>
+
                               {cardMediaUrl && <div className="mt-2 text-xs text-emerald-600 font-medium">Imagem selecionada</div>}
                            </div>
                         )}

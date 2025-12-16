@@ -48,6 +48,7 @@ export interface Flashcard {
   answer: string;
   mediaUrl?: string;
   mediaType?: 'image';
+  mediaSide?: 'question' | 'answer'; // New field: determines where the image appears
   
   // Custom Logic Fields
   interval: number; // Days until next review
