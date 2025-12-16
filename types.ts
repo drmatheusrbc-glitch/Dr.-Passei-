@@ -40,17 +40,21 @@ export interface MockExam {
   date: string;
 }
 
-// --- Flashcards Types ---
+// --- Flashcards Types (Anki Style) ---
 
 export interface Flashcard {
   id: string;
   question: string;
   answer: string;
   mediaUrl?: string;
-  mediaType?: 'image' | 'video' | 'audio';
-  // SRS Fields (Simple implementation)
-  box: number; // 0 to 5
-  lastReviewed?: string;
+  mediaType?: 'image';
+  
+  // Anki / SM-2 Algorithm Fields
+  interval: number; // Days until next review
+  easeFactor: number; // Multiplier (starts at 2.5)
+  repetitions: number; // Consecutive successful reviews
+  dueDate: string; // ISO Date string for next review
+  state: 'new' | 'learning' | 'review' | 'relearning';
 }
 
 export interface FlashcardSubDeck {
